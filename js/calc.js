@@ -78,7 +78,6 @@ function openCalculator(mode) {
                    เรทคำนวณ: ${adjustW.toFixed(2)} x ${adjustH.toFixed(2)} ม.<br>
                    พื้นที่คิดเงิน: ${area.toFixed(2)} ตร.ล. (x1.2)<br>
                    ราคา: ${area.toFixed(2)} x ${price.toLocaleString()} = ${totalPerSet.toLocaleString()} บ.`;
-    }
     } else if (mode === 'ALU25') {
         titleText.innerText = 'คำนวณมู่ลี่อลูมิเนียม 25mm.';
         titleIcon.innerText = '📏';
