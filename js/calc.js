@@ -1,48 +1,16 @@
-// js/calculator.js
-
+// --- CALCULATOR VARIABLES ---
 let calcMode = 'EXT';
 let calcUnit = 'm';
 let calcItems = [];
-let currentEditingId = null; 
-let currentEditingDocId = null;
-let tempQuotes = [];
 
-function parsePriceCSV(text) {
-    const lines = text.trim().split('\n');
-    const data = {};
-    lines.forEach(line => {
-        const cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.trim().replace(/^"|"$/g, ''));
-        if (cols.length >= 2) {
-            let size = cols[0];
-            let price = parseFloat(cols[1].replace(/,/g, ''));
-            if (size && !isNaN(price)) {
-                data[size] = price;
-            }
-        }
-    });
-    return data;
-}
-
-async function loadAlu25PriceData() {
-    if (!alu25Cache.STD) {
-        try {
-            const res = await fetch(ALU25_STD_URL);
-            const text = await res.text();
-            alu25Cache.STD = parsePriceCSV(text);
-        } catch(e) { console.error("Error loading ALU STD", e); }
-    }
-    if (!alu25Cache.CHAIN) {
-        try {
-            const res = await fetch(ALU25_CHAIN_URL);
-            const text = await res.text();
-            alu25Cache.CHAIN = parsePriceCSV(text);
-        } catch(e) { console.error("Error loading ALU CHAIN", e); }
-    }
+// --- CALCULATOR FUNCTIONS ---
+function setCalcUnit(u) {
+    calcUnit = u;
 }
 
 function switchCalcMode(mode) {
     openCalculator(mode);
-    toggleSidebar();
+    if(typeof toggleSidebar === 'function') toggleSidebar();
 }
 
 function openCalculator(mode) {
@@ -76,7 +44,7 @@ function openCalculator(mode) {
         priceInput.readOnly = true;
         priceInput.placeholder = "รอค้นหาอัตโนมัติ...";
         priceInput.value = "";
-        loadAlu25PriceData(); 
+        if(typeof loadAlu25PriceData === 'function') loadAlu25PriceData();
     }
 
     renderCalcTable();
@@ -97,16 +65,20 @@ function addCalcItem() {
     let displayUnit = 'm';
     let systemLabel = '';
 
+    // --- ALU 25 Logic ---
     if (calcMode === 'ALU25') {
         const roundCustom = (val) => Math.round(val / 10) * 10;
         let lookupW = roundCustom(wInput);
         let lookupH = roundCustom(hInput);
+        
         finalW = wInput;
         finalH = hInput; 
         displayUnit = 'cm';
+
         const key = `${lookupW}*${lookupH}`;
         const sysType = document.querySelector('input[name="aluSystem"]:checked').value;
         const db = sysType === 'STD' ? alu25Cache.STD : alu25Cache.CHAIN;
+
         systemLabel = sysType === 'STD' ? 'มู่ลี่อลูมิเนียม (ธรรมดา)' : 'มู่ลี่อลูมิเนียม (โซ่วน)';
 
         if (!db || !db[key]) {
@@ -120,10 +92,12 @@ function addCalcItem() {
         document.getElementById('calcPrice').value = price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
 
     } else {
+        // --- Roller Logic ---
         price = parseFloat(document.getElementById('calcPrice').value);
         if(!price) { alert('กรุณาระบุราคา'); return; }
 
         systemLabel = calcMode === 'EXT' ? 'ม่านม้วนภายนอก' : 'ม่านม้วน';
+
         const wM = (wInput >= 10) ? wInput / 100 : wInput;
         const hM = (hInput >= 10) ? hInput / 100 : hInput;
         finalW = wM.toFixed(2);
@@ -178,8 +152,15 @@ function renderCalcTable() {
 }
 
 function removeCalcItem(idx) { calcItems.splice(idx, 1); renderCalcTable(); }
-function clearCalc() { calcItems = []; currentEditingId = null; currentEditingDocId = null; renderCalcTable(); }
 
+function clearCalc() { 
+    calcItems = []; 
+    currentEditingId = null;
+    currentEditingDocId = null;
+    renderCalcTable(); 
+}
+
+// --- QUOTATION MODAL ---
 function showQuotationModal() {
     if(calcItems.length === 0) { alert('ไม่มีรายการคำนวณ'); return; }
     document.getElementById('quotationModal').classList.remove('hidden');
@@ -214,46 +195,177 @@ function saveCurrentQuotation() {
     const user = currentUser;
     const isMember = user && !user.isAnonymous;
     
-    if (isMember && (!db || !auth)) { alert('ระบบกำลังเชื่อมต่อฐานข้อมูล กรุณารอสักครู่แล้วลองใหม่...'); return; }
+    if (isMember && (!db || !auth)) {
+        alert('ระบบกำลังเชื่อมต่อฐานข้อมูล กรุณารอสักครู่แล้วลองใหม่...');
+        return;
+    }
 
     try {
-        if (!calcItems || !Array.isArray(calcItems) || calcItems.length === 0) { alert('ไม่พบรายการสินค้า กรุณาลองคำนวณใหม่'); return; }
+        if (!calcItems || !Array.isArray(calcItems) || calcItems.length === 0) {
+            alert('ไม่พบรายการสินค้า กรุณาลองคำนวณใหม่');
+            return;
+        }
 
         let isUpdate = false;
         if (currentEditingId || currentEditingDocId) {
-            if (confirm("คุณกำลังแก้ไขรายการเดิม\nกด [ตกลง] เพื่อบันทึกทับรายการเดิม (Update)\nกด [ยกเลิก] เพื่อบันทึกเป็นรายการใหม่ (Save as New)")) { isUpdate = true; } 
+            if (confirm("คุณกำลังแก้ไขรายการเดิม\nกด [ตกลง] เพื่อบันทึกทับรายการเดิม (Update)\nกด [ยกเลิก] เพื่อบันทึกเป็นรายการใหม่ (Save as New)")) {
+                isUpdate = true;
+            }
         } else {
             const msg = isMember ? 'ยืนยันบันทึกเข้าระบบ (บัญชีของคุณ)?' : 'ยืนยันบันทึกใบเสนอราคา (ในเครื่องนี้)?';
             if (!confirm(msg)) return;
         }
 
         const finalId = (isUpdate && currentEditingId) ? currentEditingId : Date.now();
-        let typeLabel = calcMode === 'EXT' ? 'ม่านม้วนภายนอก' : (calcMode === 'ALU25' ? 'มู่ลี่อลูมิเนียม 25mm.' : 'ม่านม้วน');
+        let typeLabel = 'ม่านม้วน';
+        if(calcMode === 'EXT') typeLabel = 'ม่านม้วนภายนอก';
+        else if(calcMode === 'ALU25') typeLabel = 'มู่ลี่อลูมิเนียม 25mm.';
 
         const qData = { 
-            id: finalId, date: new Date().toISOString(), type: typeLabel, 
+            id: finalId,
+            date: new Date().toISOString(), 
+            type: typeLabel, 
             total: document.getElementById('qGrandTotal').innerText, 
             items: JSON.parse(JSON.stringify(calcItems)) 
         };
         
         if (isMember) {
-            qData.uid = user.uid; qData.ownerEmail = user.email; qData.ownerName = user.displayName;
+            qData.uid = user.uid;
+            qData.ownerEmail = user.email;
+            qData.ownerName = user.displayName;
+            
             if (isUpdate && currentEditingDocId) {
-                db.collection("quotations").doc(currentEditingDocId).update(qData).then(() => { showToast("แก้ไขข้อมูลเรียบร้อย"); closeQuotation(); clearCalc(); }).catch(e => { console.error(e); alert("Error: " + e.message); });
+                db.collection("quotations").doc(currentEditingDocId).update(qData).then(() => { 
+                    showToast("แก้ไขข้อมูลเรียบร้อย");
+                    closeQuotation();
+                    clearCalc(); 
+                }).catch(e => { console.error(e); alert("เกิดข้อผิดพลาดในการอัพเดท: " + e.message); });
             } else {
                 delete qData.docId; 
-                db.collection("quotations").add(qData).then(() => { showToast("บันทึกรายการใหม่เรียบร้อย"); closeQuotation(); clearCalc(); }).catch(e => { console.error(e); alert("Error: " + e.message); });
+                db.collection("quotations").add(qData).then(() => { 
+                    showToast("บันทึกรายการใหม่เรียบร้อย");
+                    closeQuotation();
+                    clearCalc();
+                }).catch(e => { console.error(e); alert("เกิดข้อผิดพลาดในการบันทึก: " + e.message); });
             }
         } else {
             let saved = [];
             try { saved = JSON.parse(localStorage.getItem('sunny_quotations')) || []; } catch(e) { saved = []; }
             if (isUpdate && currentEditingId) {
                 const idx = saved.findIndex(x => x.id === currentEditingId);
-                if (idx !== -1) saved[idx] = qData; else saved.push(qData);
-            } else { saved.push(qData); }
+                if (idx !== -1) { saved[idx] = qData; showToast("แก้ไขข้อมูล (Guest) เรียบร้อย"); } 
+                else { saved.push(qData); showToast("บันทึกใหม่ (Guest) เรียบร้อย"); }
+            } else {
+                saved.push(qData); showToast("บันทึก (Guest) เรียบร้อย");
+            }
             localStorage.setItem('sunny_quotations', JSON.stringify(saved));
-            showToast("บันทึก (Guest) เรียบร้อย");
-            closeQuotation(); clearCalc();
+            closeQuotation();
+            clearCalc();
         }
-    } catch (e) { console.error("Critical Save Error:", e); alert("Error: " + e.message); }
+    } catch (e) {
+        console.error("Critical Save Error:", e);
+        alert("เกิดข้อผิดพลาดร้ายแรง: " + e.message);
+    }
+}
+
+// --- HISTORY & MANAGEMENT ---
+async function deleteOnlineQuote(docId, containerId, mode) { 
+    if(!confirm('ยืนยันการลบข้อมูลนี้ถาวร?')) return; 
+    try { 
+        await db.collection("quotations").doc(docId).delete(); 
+        showToast("ลบข้อมูลเรียบร้อย"); 
+        renderQuotationsList(containerId, mode); 
+    } catch(e) { console.error(e); alert("Error: " + e.message); } 
+}
+
+function deleteOfflineQuote(id) { 
+    if(!confirm('ลบรายการนี้?')) return; 
+    let saved = JSON.parse(localStorage.getItem('sunny_quotations')) || []; 
+    saved = saved.filter(x => x.id !== id); 
+    localStorage.setItem('sunny_quotations', JSON.stringify(saved)); 
+    renderQuotationsList('user-history-list', 'mine'); 
+}
+
+async function renderQuotationsList(containerId, mode = 'mine') {
+    const list = document.getElementById(containerId);
+    if(!list) return;
+    list.innerHTML = '<div class="text-center py-8"><span class="loader inline-block w-6 h-6 border-2 border-slate-200 border-t-sunny-red rounded-full"></span></div>';
+
+    let quotes = [];
+    const user = currentUser;
+
+    try {
+        if (mode === 'all') {
+            const snap = await db.collection("quotations").get();
+            snap.forEach(doc => quotes.push({ ...doc.data(), docId: doc.id }));
+        } else {
+            if (user && !user.isAnonymous) {
+                 const snap = await db.collection("quotations").where("uid", "==", user.uid).get();
+                 snap.forEach(doc => quotes.push({ ...doc.data(), docId: doc.id }));
+            } else {
+                 quotes = JSON.parse(localStorage.getItem('sunny_quotations')) || [];
+            }
+        }
+    } catch(e) {
+        console.error(e);
+        list.innerHTML = `<div class="text-center text-red-400">Error: ${e.message}</div>`;
+        return;
+    }
+
+    quotes.sort((a,b) => (b.id || 0) - (a.id || 0));
+    tempQuotes = quotes; 
+
+    if (quotes.length === 0) {
+        list.innerHTML = `<div class="text-center text-slate-400 py-8 flex flex-col items-center"><span class="text-4xl mb-2 opacity-30">📭</span>ไม่มีรายการบันทึก</div>`;
+        return;
+    }
+
+    list.innerHTML = '';
+    quotes.forEach((q, index) => {
+        const dateStr = new Date(q.date || q.id).toLocaleString('th-TH');
+        const ownerInfo = (mode === 'all' && q.ownerName) ? `<div class="text-[10px] text-sunny-red bg-red-50 px-1 rounded inline-block mb-1">👤 ${q.ownerName}</div>` : '';
+        
+        const div = document.createElement('div');
+        div.className = "bg-white p-4 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-all flex justify-between items-center group mb-2";
+        div.innerHTML = `
+            <div>
+                ${ownerInfo}
+                <div class="font-bold text-slate-700 text-sm">${q.type} ${!q.uid ? '<span class="text-[9px] bg-gray-100 text-gray-500 px-1 rounded">Local</span>' : ''}</div>
+                <div class="text-xs text-slate-400 mt-0.5">📅 ${dateStr} <span class="text-slate-300">|</span> ${q.items.length} รายการ</div>
+            </div>
+            <div class="text-right">
+                <div class="font-black text-lg text-sunny-red">${q.total}</div>
+                <div class="flex gap-2 justify-end mt-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onclick='loadQuoteByIndex(${index})' class="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs rounded-lg font-bold">แก้ไข/ดู</button>
+                    <button onclick="${(mode === 'all' || (user && !user.isAnonymous)) ? `deleteOnlineQuote('${q.docId}', '${containerId}', '${mode}')` : `deleteOfflineQuote(${q.id})`}" class="px-3 py-1 bg-red-50 hover:bg-red-100 text-red-500 text-xs rounded-lg font-bold">ลบ</button>
+                </div>
+            </div>
+        `;
+        list.appendChild(div);
+    });
+}
+
+function loadQuoteByIndex(index) {
+    const q = tempQuotes[index];
+    if(!q) return;
+    
+    if(q.type.includes('ภายนอก')) calcMode = 'EXT';
+    else if(q.type.includes('25mm')) calcMode = 'ALU25';
+    else calcMode = 'INT';
+
+    calcItems = q.items || []; 
+    currentEditingId = q.id;
+    currentEditingDocId = q.docId || null;
+    
+    document.getElementById('historyModal').classList.add('hidden');
+    if(typeof closeConfig === 'function') closeConfig();
+    
+    openCalculator(calcMode);
+    showQuotationModal();
+    showToast("โหลดข้อมูลเรียบร้อย");
+}
+
+function openHistoryModal() {
+    document.getElementById('historyModal').classList.remove('hidden');
+    renderQuotationsList('user-history-list', 'mine');
 }
