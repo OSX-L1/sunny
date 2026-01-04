@@ -37,13 +37,48 @@ function openCalculator(mode) {
         priceInput.readOnly = false;
         priceInput.placeholder = "ระบุราคา";
         priceInput.value = "";
-    } else if (mode === 'PVC_CALC') {
-        titleText.innerText = 'คำนวณฉากกั้นห้อง PVC';
-        titleIcon.innerText = '🚪';
-        sysSelect.classList.add('hidden');
-        priceInput.readOnly = false;
-        priceInput.placeholder = "ระบุราคา/ตร.ล.";
-        priceInput.value = "";
+    } else if (calcMode === 'PVC_CALC') {
+        price = parseFloat(document.getElementById('calcPrice').value);
+        if(!price) { alert('กรุณาระบุราคา'); return; }
+        
+        systemLabel = 'ฉากกั้นห้อง PVC';
+        displayUnit = 'm';
+
+        // 1. แปลงหน่วยเป็นเมตร (ใช้สำหรับแสดงผล และตั้งต้นการคำนวณ)
+        let wM = (wInput >= 10) ? wInput / 100 : wInput;
+        let hM = (hInput >= 10) ? hInput / 100 : hInput;
+        
+        // --- ส่วนแสดงผล (ใช้ค่าจริงที่ลูกค้ากรอก) ---
+        finalW = wM.toFixed(2);
+        finalH = hM.toFixed(2);
+
+        // --- ส่วนคำนวณ (Calculated Variables - ผู้ใช้ไม่เห็นตรงนี้ในตารางหลัก) ---
+        
+        // กว้าง: ขั้นต่ำ 1.00 ม.
+        let adjustW = (wM < 1.00) ? 1.00 : wM;
+
+        // สูง: ปรับ Step ความสูง
+        let adjustH = 0;
+        if (hM <= 2.00) adjustH = 2.00;      // ไม่เกิน 2.00 คิด 2.00 (ถ้า 2.00 พอดี ก็คิด 2.00)
+        else if (hM <= 2.20) adjustH = 2.20; // 2.01 - 2.20 คิด 2.20
+        else if (hM <= 2.40) adjustH = 2.40; // 2.21 - 2.40 คิด 2.40
+        else if (hM <= 2.60) adjustH = 2.60;
+        else if (hM <= 2.80) adjustH = 2.80;
+        else if (hM <= 3.00) adjustH = 3.00;
+        else if (hM <= 3.30) adjustH = 3.30;
+        else adjustH = 3.50; // สูงสุด 3.50
+
+        // สูตรคำนวณราคา: ใช้ตัวแปร adjustW และ adjustH
+        const area = adjustW * adjustH * 1.2;
+        totalPerSet = area * price;
+
+        // รายละเอียด (แสดงเฉพาะตอนกดดูรายละเอียด หรือในใบเสนอราคา)
+        // บรรทัดแรกโชว์ขนาดจริง เพื่อยืนยันกับลูกค้า
+        details = `ขนาดจริง: ${finalW} x ${finalH} ม.<br>
+                   เรทคำนวณ: ${adjustW.toFixed(2)} x ${adjustH.toFixed(2)} ม.<br>
+                   พื้นที่คิดเงิน: ${area.toFixed(2)} ตร.ล. (x1.2)<br>
+                   ราคา: ${area.toFixed(2)} x ${price.toLocaleString()} = ${totalPerSet.toLocaleString()} บ.`;
+    }
     } else if (mode === 'ALU25') {
         titleText.innerText = 'คำนวณมู่ลี่อลูมิเนียม 25mm.';
         titleIcon.innerText = '📏';
