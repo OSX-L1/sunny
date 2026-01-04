@@ -1,23 +1,4 @@
-
-// js/config.js
-
-// --- CONFIGURATION & CONSTANTS ---
-const WOOD_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQz2OtjzRBmeUmLOTSgJ-Bt2woZPiR9QyzvIWcBXacheG3IplefFZE66yWYE43qVRQo2DAOPu9UClh5/pub?gid=1132498145&single=true&output=csv";
-const PVC_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQz2OtjzRBmeUmLOTSgJ-Bt2woZPiR9QyzvIWcBXacheG3IplefFZE66yWYE43qVRQo2DAOPu9UClh5/pub?gid=1230787558&single=true&output=csv";
-const ROLLER_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQz2OtjzRBmeUmLOTSgJ-Bt2woZPiR9QyzvIWcBXacheG3IplefFZE66yWYE43qVRQo2DAOPu9UClh5/pub?gid=1019928538&single=true&output=csv";
-const ALU_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQz2OtjzRBmeUmLOTSgJ-Bt2woZPiR9QyzvIWcBXacheG3IplefFZE66yWYE43qVRQo2DAOPu9UClh5/pub?gid=1880232984&single=true&output=csv";
-
-// ALU25 Price Tables
-const ALU25_STD_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQz2OtjzRBmeUmLOTSgJ-Bt2woZPiR9QyzvIWcBXacheG3IplefFZE66yWYE43qVRQo2DAOPu9UClh5/pub?gid=684509454&single=true&output=csv";
-const ALU25_CHAIN_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQz2OtjzRBmeUmLOTSgJ-Bt2woZPiR9QyzvIWcBXacheG3IplefFZE66yWYE43qVRQo2DAOPu9UClh5/pub?gid=374964719&single=true&output=csv";
-
-const ICONS = {
-    wood: '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>',
-    alu: '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>',
-    pvc: '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 00-2-2h-2a2 2 0 00-2 2" /></svg>',
-    roller: '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>'
-};
-
+// --- FIREBASE CONFIGURATION ---
 const firebaseConfig = {
     apiKey: "AIzaSyCAWVxXlTIzt9zvuCZADEVYi1xCtJ8hdcA",
     authDomain: "sunny1988-a4483.firebaseapp.com",
@@ -27,6 +8,16 @@ const firebaseConfig = {
     appId: "1:436626327232:web:b3b67dd892aff358624f25"
 };
 
+// --- GLOBAL VARIABLES ---
+let db = null, auth = null;
+let currentUser = null; // Holds the logged in user object
+let configListenerSet = false;
+let tempQuotes = []; // Store loaded quotes for easy access
+let currentEditingId = null; // ID for local storage edit
+let currentEditingDocId = null; // Doc ID for firestore edit
+let tempConfig = null; // For Admin editing
+
+// --- DEFAULT APP CONFIG ---
 const DEFAULT_CONFIG = {
     appTitle: "SUNNY",
     theme: 'default',
@@ -42,13 +33,72 @@ const DEFAULT_CONFIG = {
     features: { experimental_mode: false }
 };
 
-// Global State Variables
 let appConfig = DEFAULT_CONFIG;
-let db = null, auth = null;
-let currentUser = null;
-let configListenerSet = false;
-let currentSystem = 'WOOD'; 
-let cache = { WOOD: null, PVC: null, ROLLER: null, ALU: null };
-let alu25Cache = { STD: null, CHAIN: null };
-let tempConfig = {}; // For Admin
-let deferredPrompt; // For PWA
+
+// Load Config from LocalStorage (Fallback)
+try {
+    const saved = localStorage.getItem('sunny_app_config');
+    if(saved) appConfig = JSON.parse(saved);
+} catch(e) {
+    console.error("Config corrupted, resetting:", e);
+    localStorage.removeItem('sunny_app_config');
+}
+
+// Ensure defaults exist
+if(!appConfig.calcSettings) appConfig.calcSettings = DEFAULT_CONFIG.calcSettings;
+if(!appConfig.theme) appConfig.theme = 'default';
+if(!appConfig.features) appConfig.features = DEFAULT_CONFIG.features;
+
+// --- INITIALIZATION FUNCTION ---
+function initFirebase() {
+    try {
+        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+        auth = firebase.auth();
+        db = firebase.firestore();
+
+        // Listen to Auth State Changes
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                // User is signed in
+                currentUser = user;
+                console.log("Auth Status:", user.isAnonymous ? "Guest Mode" : "Member Mode (" + user.email + ")");
+                
+                // Update UI to show User Profile (Function in ui.js)
+                if(typeof renderUserSidebar === 'function') renderUserSidebar(user);
+                
+                // Load App Config (Realtime)
+                if (!configListenerSet) {
+                    db.collection("app_settings").doc("config").onSnapshot((doc) => {
+                        if (doc.exists) {
+                            const newData = doc.data();
+                            if(typeof checkAndNotifyNews === 'function') checkAndNotifyNews(newData.newsItems || []);
+                            appConfig = newData;
+                            
+                            // Fallbacks
+                            if(!appConfig.calcSettings) appConfig.calcSettings = DEFAULT_CONFIG.calcSettings;
+                            if(!appConfig.newsItems) appConfig.newsItems = [];
+                            if(!appConfig.theme) appConfig.theme = 'default';
+                            
+                            localStorage.setItem('sunny_app_config', JSON.stringify(appConfig));
+                            
+                            // Call UI updates if functions exist
+                            if(typeof renderSidebar === 'function') renderSidebar(); 
+                            if(typeof renderNews === 'function') renderNews(); 
+                            if(typeof applyTheme === 'function') applyTheme(appConfig.theme);
+                            if(currentSystem && typeof switchSystem === 'function') switchSystem(currentSystem);
+                        } else { 
+                            // Create default config if missing
+                            db.collection("app_settings").doc("config").set(appConfig); 
+                        }
+                    }, error => console.error("Config Listener Error:", error));
+                    configListenerSet = true;
+                }
+
+            } else {
+                // No user, sign in anonymously
+                console.log("No user, signing in anonymously...");
+                auth.signInAnonymously().catch(e => console.error("Anon Auth Error:", e));
+            }
+        });
+    } catch (e) { console.error("Firebase Init Error:", e); }
+}
