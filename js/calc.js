@@ -37,47 +37,13 @@ function openCalculator(mode) {
         priceInput.readOnly = false;
         priceInput.placeholder = "ระบุราคา";
         priceInput.value = "";
-    } else if (calcMode === 'PVC_CALC') {
-        price = parseFloat(document.getElementById('calcPrice').value);
-        if(!price) { alert('กรุณาระบุราคา'); return; }
-        
-        systemLabel = 'ฉากกั้นห้อง PVC';
-        displayUnit = 'm';
-
-        // 1. แปลงหน่วยเป็นเมตร (ใช้สำหรับแสดงผล และตั้งต้นการคำนวณ)
-        let wM = (wInput >= 10) ? wInput / 100 : wInput;
-        let hM = (hInput >= 10) ? hInput / 100 : hInput;
-        
-        // --- ส่วนแสดงผล (ใช้ค่าจริงที่ลูกค้ากรอก) ---
-        finalW = wM.toFixed(2);
-        finalH = hM.toFixed(2);
-
-        // --- ส่วนคำนวณ (Calculated Variables - ผู้ใช้ไม่เห็นตรงนี้ในตารางหลัก) ---
-        
-        // กว้าง: ขั้นต่ำ 1.00 ม.
-        let adjustW = (wM < 1.00) ? 1.00 : wM;
-
-        // สูง: ปรับ Step ความสูง
-        let adjustH = 0;
-        if (hM <= 2.00) adjustH = 2.00;      // ไม่เกิน 2.00 คิด 2.00 (ถ้า 2.00 พอดี ก็คิด 2.00)
-        else if (hM <= 2.20) adjustH = 2.20; // 2.01 - 2.20 คิด 2.20
-        else if (hM <= 2.40) adjustH = 2.40; // 2.21 - 2.40 คิด 2.40
-        else if (hM <= 2.60) adjustH = 2.60;
-        else if (hM <= 2.80) adjustH = 2.80;
-        else if (hM <= 3.00) adjustH = 3.00;
-        else if (hM <= 3.30) adjustH = 3.30;
-        else adjustH = 3.50; // สูงสุด 3.50
-
-        // สูตรคำนวณราคา: ใช้ตัวแปร adjustW และ adjustH
-        const area = adjustW * adjustH * 1.2;
-        totalPerSet = area * price;
-
-        // รายละเอียด (แสดงเฉพาะตอนกดดูรายละเอียด หรือในใบเสนอราคา)
-        // บรรทัดแรกโชว์ขนาดจริง เพื่อยืนยันกับลูกค้า
-        details = `ขนาดจริง: ${finalW} x ${finalH} ม.<br>
-                   เรทคำนวณ: ${adjustW.toFixed(2)} x ${adjustH.toFixed(2)} ม.<br>
-                   พื้นที่คิดเงิน: ${area.toFixed(2)} ตร.ล. (x1.2)<br>
-                   ราคา: ${area.toFixed(2)} x ${price.toLocaleString()} = ${totalPerSet.toLocaleString()} บ.`;
+    } else if (mode === 'PVC_CALC') {
+        titleText.innerText = 'คำนวณฉากกั้นห้อง PVC';
+        titleIcon.innerText = '🚪';
+        sysSelect.classList.add('hidden');
+        priceInput.readOnly = false;
+        priceInput.placeholder = "ระบุราคา/ตร.ล.";
+        priceInput.value = "";
     } else if (mode === 'ALU25') {
         titleText.innerText = 'คำนวณมู่ลี่อลูมิเนียม 25mm.';
         titleIcon.innerText = '📏';
@@ -114,16 +80,22 @@ function addCalcItem() {
         systemLabel = 'ฉากกั้นห้อง PVC';
         displayUnit = 'm';
 
-        // Auto Convert Unit (cm to m)
+        // แปลงหน่วยเป็นเมตร (ถ้ากรอกมาเกิน 10 สันนิษฐานว่าเป็น cm)
         let wM = (wInput >= 10) ? wInput / 100 : wInput;
         let hM = (hInput >= 10) ? hInput / 100 : hInput;
         
-        // 1. Minimum Width 1.00m
-        if (wM < 1.00) wM = 1.00;
+        // --- ส่วนแสดงผล (ใช้ค่าจริงที่ลูกค้ากรอก) ---
         finalW = wM.toFixed(2);
+        finalH = hM.toFixed(2);
 
-        // 2. Minimum Height & Step Logic
-        let adjustH = 0;
+        // --- ส่วนคำนวณ (Calculated Variables) ---
+        
+        // 1. ความกว้างขั้นต่ำ 1.00 ม.
+        let adjustW = (wM < 1.00) ? 1.00 : wM;
+
+        // 2. ความสูงปรับ Step (ตามเงื่อนไขที่กำหนด)
+        let adjustH = 2.00; // เริ่มต้นที่ 2.00
+        
         if (hM <= 2.01) adjustH = 2.00;
         else if (hM <= 2.21) adjustH = 2.20;
         else if (hM <= 2.41) adjustH = 2.40;
@@ -131,19 +103,17 @@ function addCalcItem() {
         else if (hM <= 2.81) adjustH = 2.80;
         else if (hM <= 3.01) adjustH = 3.00;
         else if (hM <= 3.31) adjustH = 3.30;
-        else adjustH = 3.50; // Max cap or > 3.31
+        else adjustH = 3.50; // Max cap (3.32 - 3.50)
 
-        finalH = adjustH.toFixed(2);
-
-        // Formula: W * H * 1.2 * Qty * Price
-        const area = wM * adjustH * 1.2;
+        // สูตร: กว้าง(ปรับ) x สูง(ปรับ) x 1.2 x ราคา
+        const area = adjustW * adjustH * 1.2;
         totalPerSet = area * price;
 
-        details = `กว้างคำนวณ: ${finalW} ม. (ขั้นต่ำ 1.00)<br>
-                   สูงจริง: ${hM.toFixed(2)} ปรับเป็น: ${finalH} ม.<br>
-                   สูตร: ${finalW} x ${finalH} x 1.2 = ${area.toFixed(2)} ตร.ล.<br>
+        details = `ขนาดจริง: ${finalW} x ${finalH} ม.<br>
+                   เรทคำนวณ: ${adjustW.toFixed(2)} x ${adjustH.toFixed(2)} ม.<br>
+                   พื้นที่: ${area.toFixed(2)} ตร.ล. (รวมคูณ 1.2)<br>
                    ราคา: ${area.toFixed(2)} x ${price.toLocaleString()} = ${totalPerSet.toLocaleString()} บ.`;
-    } 
+    }
     // --- ALU 25 Logic ---
     else if (calcMode === 'ALU25') {
         const roundCustom = (val) => Math.round(val / 10) * 10;
@@ -170,8 +140,9 @@ function addCalcItem() {
         details = `ขนาดจริง: ${wInput}x${hInput} cm<br>ปรับขนาดคำนวณ: ${lookupW}x${lookupH} cm<br>ระบบ: ${sysType==='STD'?'ธรรมดา':'โซ่วน'}<br>ราคาตามตาราง: ${price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} บ.`;
         document.getElementById('calcPrice').value = price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
 
-    } else {
-        // --- Roller Logic ---
+    } 
+    // --- Roller / Ext Logic ---
+    else {
         price = parseFloat(document.getElementById('calcPrice').value);
         if(!price) { alert('กรุณาระบุราคา'); return; }
 
@@ -431,7 +402,8 @@ function loadQuoteByIndex(index) {
     if(!q) return;
     
     if(q.type.includes('ภายนอก')) calcMode = 'EXT';
-    else if(q.type.includes('25mm')) calcMode = 'ALU25';
+    else if(q.type.includes('PVC') || q.type.includes('ฉาก')) calcMode = 'PVC_CALC';
+    else if(q.type.includes('25mm') || q.type.includes('อลู')) calcMode = 'ALU25';
     else calcMode = 'INT';
 
     calcItems = q.items || []; 
