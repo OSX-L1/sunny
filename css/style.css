@@ -1,5 +1,3 @@
-/* css/style.css */
-
 /* CORE STYLES */
 :root { --sunny-red: #E63946; --sunny-dark: #1D3557; }
 .loader { border-top-color: var(--sunny-red); animation: spin 1s infinite linear; }
@@ -9,7 +7,7 @@
 .header-custom-bg { position: relative; min-height: 280px; }
 @media (min-width: 768px) { .header-custom-bg { min-height: 380px; } }
 
-/* BENTO GRID BG STYLES */
+/* UPDATED: BENTO GRID BG STYLES */
 .bento-grid-bg { 
     position: absolute; inset: 0; width: 100%; height: 100%; 
     z-index: 0; overflow: hidden; border-radius: 2rem; 
