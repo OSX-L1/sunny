@@ -9,6 +9,7 @@ const ALU25_STD_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQz2OtjzR
 const ALU25_CHAIN_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQz2OtjzRBmeUmLOTSgJ-Bt2woZPiR9QyzvIWcBXacheG3IplefFZE66yWYE43qVRQo2DAOPu9UClh5/pub?gid=374964719&single=true&output=csv";
 
 // --- DEFAULT BACKGROUND IMAGES (FALLBACK) ---
+// ส่วนนี้คือส่วนสำคัญที่หายไป ทำให้ภาพไม่แสดงครับ
 const DEFAULT_BGS = {
     WOOD: [
         'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=800&q=80',
@@ -281,7 +282,7 @@ function switchSystem(system) {
              if(slotImages[2].length === 0 && images[0]) slotImages[2].push(images[0]);
         }
     } 
-    // Priority 2: Fallback to DEFAULT_BGS (Added back to fix white screen)
+    // Priority 2: Fallback to DEFAULT_BGS
     else if (typeof DEFAULT_BGS !== 'undefined' && DEFAULT_BGS[system]) {
         hasImages = true;
         const defaults = DEFAULT_BGS[system];
@@ -333,6 +334,7 @@ function switchSystem(system) {
         header.insertBefore(gridContainer, header.firstChild);
 
     } else {
+        // Fallback to Wooden Pattern if no images found
         header.style.backgroundImage = '';
         header.classList.remove('header-custom-bg');
         header.classList.add('wooden-pattern');
