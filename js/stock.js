@@ -8,7 +8,7 @@ const ALU_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQz2OtjzRBm
 const ALU25_STD_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQz2OtjzRBmeUmLOTSgJ-Bt2woZPiR9QyzvIWcBXacheG3IplefFZE66yWYE43qVRQo2DAOPu9UClh5/pub?gid=684509454&single=true&output=csv";
 const ALU25_CHAIN_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQz2OtjzRBmeUmLOTSgJ-Bt2woZPiR9QyzvIWcBXacheG3IplefFZE66yWYE43qVRQo2DAOPu9UClh5/pub?gid=374964719&single=true&output=csv";
 
-// --- DEFAULT BACKGROUND IMAGES (ส่วนสำคัญ: ภาพสำรองกันจอขาว) ---
+// --- DEFAULT BACKGROUND IMAGES (ภาพสำรอง: แสดงเมื่อยังโหลดภาพจาก Admin ไม่เสร็จ) ---
 const DEFAULT_BGS = {
     WOOD: [
         'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=800&q=80',
@@ -281,7 +281,7 @@ function switchSystem(system) {
              if(slotImages[2].length === 0 && images[0]) slotImages[2].push(images[0]);
         }
     } 
-    // Priority 2: Fallback to DEFAULT_BGS (Added back to fix white screen)
+    // Priority 2: Fallback to DEFAULT_BGS
     else if (typeof DEFAULT_BGS !== 'undefined' && DEFAULT_BGS[system]) {
         hasImages = true;
         const defaults = DEFAULT_BGS[system];
@@ -293,12 +293,22 @@ function switchSystem(system) {
     if (hasImages) {
         header.classList.add('header-custom-bg');
         header.classList.remove('wooden-pattern');
-        // REMOVED: header.classList.add('wooden-pattern'); which causes white overlay look if BG is transparent
         headerContent.classList.add('header-content-glass');
         header.style.backgroundImage = '';
         
+        // Create Bento Grid Container
         const gridContainer = document.createElement('div');
-        gridContainer.className = 'bento-grid-bg grid grid-cols-3 gap-0.5 bg-white/20'; 
+        gridContainer.className = 'bento-grid-bg grid grid-cols-3 gap-0.5 bg-white/20';
+        
+        // *** FIX: FORCE STYLES INLINE ***
+        // ป้องกันปัญหากรณี CSS โหลดไม่ติด หรือชื่อคลาสไม่ตรง
+        gridContainer.style.position = 'absolute';
+        gridContainer.style.inset = '0';
+        gridContainer.style.width = '100%';
+        gridContainer.style.height = '100%';
+        gridContainer.style.zIndex = '0';
+        gridContainer.style.overflow = 'hidden';
+        gridContainer.style.borderRadius = '2rem';
         
         [0, 1, 2].forEach(colIndex => {
             const colDiv = document.createElement('div');
@@ -310,6 +320,15 @@ function switchSystem(system) {
                     const slide = document.createElement('div');
                     slide.className = `bg-slide-item ${imgIdx === 0 ? 'active' : ''}`;
                     slide.style.backgroundImage = `url('${url}')`;
+                    
+                    // FIX: Force Slide Styles
+                    slide.style.backgroundSize = 'cover';
+                    slide.style.backgroundPosition = 'center';
+                    slide.style.position = 'absolute';
+                    slide.style.inset = '0';
+                    slide.style.width = '100%';
+                    slide.style.height = '100%';
+                    
                     colDiv.appendChild(slide);
                 });
                 
@@ -320,8 +339,14 @@ function switchSystem(system) {
                             const slides = colDiv.querySelectorAll('.bg-slide-item');
                             if(slides.length === 0) return;
                             slides[cur].classList.remove('active');
+                            // Fallback for missing CSS transition
+                            slides[cur].style.opacity = '0'; 
+                            
                             cur = (cur + 1) % slides.length;
                             slides[cur].classList.add('active');
+                            // Fallback for missing CSS transition
+                            slides[cur].style.opacity = '1';
+                            
                         }, 5000 + (colIndex * 1500)); 
                         slideshowIntervals.push(interval);
                     }, colIndex * 800);
