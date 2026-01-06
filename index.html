@@ -18,7 +18,6 @@
 
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
     
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
@@ -32,121 +31,204 @@
     
     <style>
         .header-custom-bg { position: relative; min-height: 280px; }
+        .glass-panel { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.5); }
+        
+        /* CSS Charts (Lightweight & Stable) */
+        .chart-bar { transition: height 1s ease-out; }
+        .chart-line { stroke-dasharray: 1000; stroke-dashoffset: 1000; animation: dash 2s linear forwards; }
+        @keyframes dash { to { stroke-dashoffset: 0; } }
+        
         @media (min-width: 768px) { .header-custom-bg { min-height: 380px; } }
-
         @media (max-width: 768px) { 
-            .header-custom-bg { 
-                min-height: 200px; 
-                display: flex !important;
-                flex-direction: column;
-                justify-content: flex-start; 
-                align-items: flex-start;   
-                padding: 1.5rem !important; 
-            } 
-            .header-content-glass { 
-                width: auto; 
-                max-width: 85%; 
-                margin: 0; 
-                display: inline-block; 
-                padding: 0.75rem 1rem; 
-                background: rgba(255, 255, 255, 0.55) !important; 
-                backdrop-filter: blur(6px); 
-                border: 1px solid rgba(255,255,255,0.4);
-                border-radius: 1.25rem;
-                box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-            } 
-            .header-content-glass h1 { 
-                font-size: 1.5rem !important; 
-                line-height: 1.2 !important;
-                margin-top: 0.1rem;
-            } 
-            .header-content-glass h2 { 
-                font-size: 0.65rem !important; 
-                margin-bottom: 0.2rem !important;
-                opacity: 0.7;
-            } 
+            .header-custom-bg { min-height: 200px; padding: 1.5rem !important; } 
             #headerInstallBtn { display: none !important; }
         }
     </style>
 </head>
-<body class="bg-gradient-to-br from-rose-50 via-slate-50 to-indigo-100 animate-gradient-xy h-[100dvh] font-sans text-slate-800 flex overflow-hidden noselect">
+<body class="bg-slate-50 h-[100dvh] font-sans text-slate-800 flex overflow-hidden noselect">
 
     <div id="intro-splash" class="fixed inset-0 bg-white z-[9999] flex flex-col items-center justify-center transition-opacity duration-700 ease-out">
         <h1 class="text-6xl font-black text-sunny-red italic tracking-tighter">SUNNY</h1>
         <p class="text-sm font-bold text-slate-400 mt-4 tracking-widest">STOCK SYSTEM</p>
     </div>
     
-    <div id="xmas-scene"></div>
-    <div id="toast" class="fixed top-0 left-1/2 -translate-x-1/2 z-[200] opacity-0 pointer-events-none bg-slate-800 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg><span id="toast-message" class="text-sm font-bold">บันทึกสำเร็จ</span></div>
+    <div id="toast" class="fixed top-0 left-1/2 -translate-x-1/2 z-[200] opacity-0 pointer-events-none bg-slate-800 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-2"><span id="toast-message" class="text-sm font-bold">แจ้งเตือน</span></div>
 
-    <div id="installGuideModal" class="hidden fixed inset-0 z-[1000] bg-slate-900/60 backdrop-blur-sm flex flex-col justify-end md:justify-center p-4 animate-fade-in-up" onclick="this.classList.add('hidden')">
+    <div id="installGuideModal" class="hidden fixed inset-0 z-[1000] bg-slate-900/60 backdrop-blur-sm flex flex-col justify-end md:justify-center p-4" onclick="this.classList.add('hidden')">
         <div class="bg-white rounded-t-2xl md:rounded-2xl p-6 shadow-2xl pb-10 md:pb-6 relative max-w-sm mx-auto w-full" onclick="event.stopPropagation()">
-            <div class="w-12 h-1 bg-slate-200 rounded-full mx-auto mb-4 md:hidden"></div>
-            <h3 id="installGuideTitle" class="font-bold text-lg text-slate-800 mb-4">ติดตั้งแอพ</h3>
-            <div id="installInstructions" class="space-y-4 text-sm text-slate-600"></div>
-            <button onclick="document.getElementById('installGuideModal').classList.add('hidden')" class="mt-6 w-full py-3 bg-sunny-red text-white rounded-xl font-bold shadow-lg shadow-red-200 hover:bg-red-700 btn-bounce">เข้าใจแล้ว</button>
+            <h3 class="font-bold text-lg text-slate-800 mb-4">ติดตั้งแอพ</h3>
+            <button onclick="document.getElementById('installGuideModal').classList.add('hidden')" class="mt-6 w-full py-3 bg-sunny-red text-white rounded-xl font-bold">เข้าใจแล้ว</button>
         </div>
     </div>
     
     <div id="historyModal" class="hidden fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex flex-col items-center justify-center p-4">
-        <div class="bg-white rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl animate-fade-in-up">
+        <div class="bg-white rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl">
             <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-white rounded-t-2xl z-10">
                 <h3 class="font-bold text-slate-800 text-lg">📜 ประวัติใบเสนอราคา</h3>
-                <button onclick="document.getElementById('historyModal').classList.add('hidden')" class="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-red-50 hover:text-red-500">✕</button>
+                <button onclick="document.getElementById('historyModal').classList.add('hidden')" class="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 hover:bg-red-50 hover:text-red-500">✕</button>
             </div>
             <div id="user-history-list" class="flex-1 overflow-y-auto p-4 space-y-2 bg-slate-50 custom-scrollbar"></div>
         </div>
     </div>
 
-    <div id="helpModal" class="hidden fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4" onclick="this.classList.add('hidden')">
-        <div class="bg-white rounded-2xl w-full max-w-md shadow-2xl animate-fade-in-up overflow-hidden" onclick="event.stopPropagation()">
-            <div class="p-6 bg-sunny-red text-white flex justify-between items-start">
-                <div><h3 class="font-bold text-xl mb-1">คู่มือการใช้งาน</h3><p class="text-red-100 text-xs">ระบบเช็คสต็อกและคำนวณราคา</p></div>
-                <button onclick="document.getElementById('helpModal').classList.add('hidden')" class="text-red-100 hover:text-white bg-white/10 hover:bg-white/20 rounded-lg p-1">✕</button>
-            </div>
-            <div class="p-6 space-y-4 max-h-[60vh] overflow-y-auto custom-scrollbar">
-                <div class="space-y-2"><h4 class="font-bold text-slate-800">1. การค้นหาสต็อก</h4><p class="text-sm text-slate-500">เลือกเมนูสินค้า พิมพ์รหัสเพื่อค้นหา</p></div>
-                <div class="space-y-2"><h4 class="font-bold text-slate-800">2. การคำนวณราคา</h4><p class="text-sm text-slate-500">เลือกเมนูคำนวณ ระบุขนาดและราคา</p></div>
-            </div>
-        </div>
-    </div>
-
     <button onclick="toggleSidebar()" class="md:hidden fixed top-3 left-3 z-50 bg-white/90 backdrop-blur p-2.5 rounded-xl shadow-lg border border-slate-100 text-slate-600 active:scale-95 transition-transform flex items-center gap-2">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
-        <span class="text-xs font-bold text-slate-700">เมนู</span>
+        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
     </button>
     <aside id="sidebar" class="fixed inset-y-0 left-0 z-40 w-72 bg-white shadow-2xl transform -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out border-r border-slate-100 flex flex-col h-full">
         <div class="p-6 border-b border-slate-100 flex items-center gap-3 pt-12 md:pt-6">
-            <div class="w-10 h-10 bg-sunny-red rounded-lg flex items-center justify-center text-white font-black text-xl shadow-red-200 shadow-lg shrink-0">S</div>
+            <div class="w-10 h-10 bg-sunny-red rounded-lg flex items-center justify-center text-white font-black text-xl shadow-lg shrink-0">S</div>
             <div><h1 class="font-black text-xl text-sunny-red italic tracking-tighter" id="app-title-display">SUNNY</h1><p class="text-[10px] text-slate-400 uppercase tracking-widest">Stock & Calc</p></div>
         </div>
         <nav class="flex-1 overflow-y-auto py-4 space-y-1" id="sidebar-menu-container"></nav>
         <div class="p-6 border-t border-slate-100 space-y-3">
             <div id="user-profile-section"></div>
-            <button id="pwaInstallBtn" class="hidden w-full flex items-center justify-center gap-2 bg-slate-800 text-white py-3 rounded-xl text-sm font-bold hover:bg-black transition-colors mb-2 btn-bounce">ติดตั้งแอพ</button>
+            <button id="pwaInstallBtn" class="hidden w-full flex items-center justify-center gap-2 bg-slate-800 text-white py-3 rounded-xl text-sm font-bold hover:bg-black transition-colors mb-2">ติดตั้งแอพ</button>
             <button onclick="checkAdminLogin()" class="w-full flex items-center justify-center gap-2 text-slate-300 hover:text-sunny-red py-2 rounded-xl text-xs transition-colors">Admin Mode</button>
         </div>
     </aside>
     <div id="sidebarOverlay" onclick="toggleSidebar()" class="fixed inset-0 bg-black/50 z-30 hidden md:hidden backdrop-blur-sm transition-opacity"></div>
 
-    <main class="flex-1 md:ml-72 h-full overflow-y-auto overflow-x-hidden scrolling-touch relative">
-        <div class="p-4 pt-16 md:p-8 pb-40 max-w-6xl mx-auto space-y-6">
-            <div id="headerSection" class="bg-white rounded-[2rem] p-4 md:p-8 shadow-sm border border-slate-100 wooden-pattern relative overflow-hidden hover:shadow-lg transition-all duration-500 ease-in-out">
-                <div class="absolute top-0 right-0 w-48 h-48 bg-red-50 rounded-full blur-3xl -mr-16 -mt-16 opacity-60 pointer-events-none"></div>
-                <div id="headerContentWrapper" class="relative z-10 transition-all duration-300">
-                    <h2 id="systemTitle" class="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">ระบบเช็คสต็อก</h2>
-                    <h1 class="text-xl md:text-4xl font-black text-slate-800 tracking-tight leading-tight">ตรวจสอบ<span class="text-sunny-red italic block md:inline" id="productTypeLabel">สินค้า</span></h1>
-                    <div class="mt-3 flex flex-col items-start gap-1 md:flex-row md:items-center md:gap-2">
-                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-50 text-green-700 text-[10px] font-bold border border-green-100 shadow-sm"><span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>Online</span>
-                        <span class="text-slate-500 text-[10px] bg-white/80 px-1.5 py-0.5 rounded backdrop-blur-sm">Updated: <span id="lastUpdateDisplay" class="font-semibold text-slate-700">...</span></span>
-                        <button id="headerInstallBtn" onclick="installApp()" class="hidden md:hidden inline-flex items-center gap-1 px-3 py-1 rounded-full bg-slate-800 text-white text-[10px] font-bold border border-slate-700 shadow-sm animate-pulse hover:bg-black">ติดตั้งแอพ</button>
+    <main class="flex-1 md:ml-72 h-full overflow-y-auto overflow-x-hidden scrolling-touch relative bg-slate-50">
+        <div class="p-4 pt-16 md:p-8 pb-40 max-w-7xl mx-auto space-y-8">
+            
+            <div id="proDashboard" class="animate-fade-in-up">
+                <div class="flex justify-between items-end mb-6">
+                    <div>
+                        <h2 class="text-3xl font-black text-slate-800">ภาพรวมระบบ</h2>
+                        <p class="text-sm text-slate-400 mt-1">ยินดีต้อนรับกลับ, <span id="dashUserName" class="text-sunny-red font-bold">Admin</span> 👋</p>
+                    </div>
+                    <div class="hidden md:block text-right">
+                        <p class="text-xs text-slate-400 font-bold uppercase">อัปเดตล่าสุด</p>
+                        <p class="text-sm font-bold text-slate-600" id="dashTime">Just Now</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                    <div class="lg:col-span-2 bg-white rounded-[1.5rem] p-6 shadow-sm border border-slate-100 relative overflow-hidden">
+                        <div class="flex justify-between items-start mb-6">
+                            <div>
+                                <p class="text-xs text-slate-400 font-bold uppercase">ยอดขายรายเดือน (จำลอง)</p>
+                                <h3 class="text-3xl font-black text-slate-800 mt-1">฿34,680.00</h3>
+                                <p class="text-xs text-green-500 font-bold mt-1">▲ 12% จากเดือนก่อน</p>
+                            </div>
+                            <div class="flex gap-2">
+                                <span class="w-3 h-3 rounded-full bg-purple-500"></span><span class="text-[10px] text-slate-400">Online</span>
+                                <span class="w-3 h-3 rounded-full bg-pink-500"></span><span class="text-[10px] text-slate-400">Store</span>
+                            </div>
+                        </div>
+                        <div class="h-48 flex items-end gap-2 relative z-10 pl-2 pb-2">
+                            <div class="w-full bg-slate-50 absolute bottom-0 left-0 h-px"></div>
+                            <div class="w-full bg-slate-50 absolute bottom-1/4 left-0 h-px"></div>
+                            <div class="w-full bg-slate-50 absolute bottom-2/4 left-0 h-px"></div>
+                            <div class="w-full bg-slate-50 absolute bottom-3/4 left-0 h-px"></div>
+                            <div class="flex-1 bg-purple-100 rounded-t-lg relative group h-[40%] hover:bg-purple-200 transition-all"><div class="absolute -top-6 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[9px] py-0.5 px-1.5 rounded opacity-0 group-hover:opacity-100">40%</div></div>
+                            <div class="flex-1 bg-pink-100 rounded-t-lg relative group h-[60%] hover:bg-pink-200 transition-all"><div class="absolute -top-6 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[9px] py-0.5 px-1.5 rounded opacity-0 group-hover:opacity-100">60%</div></div>
+                            <div class="flex-1 bg-purple-100 rounded-t-lg relative group h-[55%] hover:bg-purple-200 transition-all"><div class="absolute -top-6 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[9px] py-0.5 px-1.5 rounded opacity-0 group-hover:opacity-100">55%</div></div>
+                            <div class="flex-1 bg-pink-100 rounded-t-lg relative group h-[75%] hover:bg-pink-200 transition-all"><div class="absolute -top-6 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[9px] py-0.5 px-1.5 rounded opacity-0 group-hover:opacity-100">75%</div></div>
+                            <div class="flex-1 bg-gradient-to-t from-purple-500 to-pink-500 rounded-t-lg shadow-lg shadow-purple-200 relative group h-[85%] hover:scale-105 transition-all"><div class="absolute -top-6 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[9px] py-0.5 px-1.5 rounded opacity-0 group-hover:opacity-100">85%</div></div>
+                            <div class="flex-1 bg-pink-100 rounded-t-lg relative group h-[65%] hover:bg-pink-200 transition-all"><div class="absolute -top-6 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[9px] py-0.5 px-1.5 rounded opacity-0 group-hover:opacity-100">65%</div></div>
+                            <div class="flex-1 bg-purple-100 rounded-t-lg relative group h-[50%] hover:bg-purple-200 transition-all"><div class="absolute -top-6 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[9px] py-0.5 px-1.5 rounded opacity-0 group-hover:opacity-100">50%</div></div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-[1.5rem] p-6 shadow-sm border border-slate-100 flex flex-col items-center justify-center relative">
+                        <div class="relative w-40 h-40">
+                            <svg class="w-full h-full" viewBox="0 0 36 36">
+                                <path class="text-orange-100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="3.8" />
+                                <path class="text-purple-500" stroke-dasharray="70, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="3.8" />
+                                <path class="text-pink-500" stroke-dasharray="20, 100" stroke-dashoffset="-70" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" stroke-width="3.8" />
+                            </svg>
+                            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center">
+                                <span class="text-2xl font-black text-slate-800">90%</span>
+                                <span class="text-[9px] block text-slate-400">Target</span>
+                            </div>
+                        </div>
+                        <div class="flex gap-4 mt-6">
+                            <div class="text-center"><div class="text-xl font-bold text-slate-800">55%</div><div class="text-[9px] text-slate-400">● Wood</div></div>
+                            <div class="text-center"><div class="text-xl font-bold text-slate-800">35%</div><div class="text-[9px] text-slate-400">● PVC</div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-gradient-to-r from-rose-400 to-pink-500 rounded-2xl p-5 text-white shadow-lg shadow-pink-200 relative overflow-hidden group">
+                        <div class="relative z-10">
+                            <div class="text-xs font-bold opacity-80 mb-1">ใบเสนอราคา</div>
+                            <div class="text-2xl font-black" id="dashTotalQuote">432</div>
+                            <div class="text-[10px] mt-2 bg-white/20 inline-block px-1.5 py-0.5 rounded">วันนี้</div>
+                        </div>
+                        <div class="absolute -right-2 -bottom-4 text-6xl opacity-20 group-hover:scale-110 transition-transform">📄</div>
+                    </div>
+                    <div class="bg-gradient-to-r from-violet-500 to-purple-600 rounded-2xl p-5 text-white shadow-lg shadow-purple-200 relative overflow-hidden group">
+                        <div class="relative z-10">
+                            <div class="text-xs font-bold opacity-80 mb-1">ยอดเงินรวม</div>
+                            <div class="text-2xl font-black" id="dashTotalMoney">฿43k</div>
+                            <div class="text-[10px] mt-2 bg-white/20 inline-block px-1.5 py-0.5 rounded">Estimate</div>
+                        </div>
+                        <div class="absolute -right-2 -bottom-4 text-6xl opacity-20 group-hover:scale-110 transition-transform">💰</div>
+                    </div>
+                    <div class="bg-gradient-to-r from-blue-400 to-cyan-500 rounded-2xl p-5 text-white shadow-lg shadow-blue-200 relative overflow-hidden group">
+                        <div class="relative z-10">
+                            <div class="text-xs font-bold opacity-80 mb-1">สินค้าคงเหลือ</div>
+                            <div class="text-2xl font-black">85%</div>
+                            <div class="text-[10px] mt-2 bg-white/20 inline-block px-1.5 py-0.5 rounded">ภาพรวม</div>
+                        </div>
+                        <div class="absolute -right-2 -bottom-4 text-6xl opacity-20 group-hover:scale-110 transition-transform">📦</div>
+                    </div>
+                    <div class="bg-gradient-to-r from-orange-400 to-amber-500 rounded-2xl p-5 text-white shadow-lg shadow-orange-200 relative overflow-hidden group hover:shadow-orange-300 cursor-pointer" onclick="document.getElementById('searchSection').scrollIntoView({behavior:'smooth'})">
+                        <div class="relative z-10">
+                            <div class="text-xs font-bold opacity-80 mb-1">ค้นหาสินค้า</div>
+                            <div class="text-2xl font-black">Search</div>
+                            <div class="text-[10px] mt-2 bg-white/20 inline-block px-1.5 py-0.5 rounded">คลิกเลย ➜</div>
+                        </div>
+                        <div class="absolute -right-2 -bottom-4 text-6xl opacity-20 group-hover:scale-110 transition-transform">🔍</div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-[1.5rem] p-6 shadow-sm border border-slate-100">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-bold text-slate-700">กิจกรรมล่าสุด (Recent Activities)</h3>
+                        <button class="text-xs bg-slate-100 px-3 py-1 rounded-full text-slate-500 hover:bg-slate-200">View All</button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left text-slate-500">
+                            <thead class="text-xs text-slate-400 uppercase bg-slate-50">
+                                <tr>
+                                    <th class="px-4 py-3 rounded-l-lg">รายการ</th>
+                                    <th class="px-4 py-3">ลูกค้า</th>
+                                    <th class="px-4 py-3">สถานะ</th>
+                                    <th class="px-4 py-3 text-right rounded-r-lg">ยอดเงิน</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                <tr class="hover:bg-slate-50 transition-colors">
+                                    <td class="px-4 py-3 font-medium text-slate-800 flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-purple-500"></span> มู่ลี่ไม้ Basswood</td>
+                                    <td class="px-4 py-3">คุณสมชาย</td>
+                                    <td class="px-4 py-3"><span class="bg-purple-100 text-purple-600 py-0.5 px-2 rounded text-[10px] font-bold">Offer</span></td>
+                                    <td class="px-4 py-3 text-right font-bold text-slate-700">฿4,500</td>
+                                </tr>
+                                <tr class="hover:bg-slate-50 transition-colors">
+                                    <td class="px-4 py-3 font-medium text-slate-800 flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-pink-500"></span> ฉากกั้นห้อง PVC</td>
+                                    <td class="px-4 py-3">ร้านกาแฟ A</td>
+                                    <td class="px-4 py-3"><span class="bg-pink-100 text-pink-600 py-0.5 px-2 rounded text-[10px] font-bold">Done</span></td>
+                                    <td class="px-4 py-3 text-right font-bold text-slate-700">฿8,200</td>
+                                </tr>
+                                <tr class="hover:bg-slate-50 transition-colors">
+                                    <td class="px-4 py-3 font-medium text-slate-800 flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-blue-500"></span> ม่านม้วนภายนอก</td>
+                                    <td class="px-4 py-3">Project X</td>
+                                    <td class="px-4 py-3"><span class="bg-blue-100 text-blue-600 py-0.5 px-2 rounded text-[10px] font-bold">Draft</span></td>
+                                    <td class="px-4 py-3 text-right font-bold text-slate-700">฿12,000</td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
-
+            
             <div id="news-container" class="space-y-3 hidden"><div id="pinned-news-wrapper" class="space-y-3"></div><div id="scrolling-news-wrapper" class="bg-white border border-slate-200 rounded-xl shadow-sm relative overflow-hidden h-28 hidden"><div id="news-ticker-track" class="ticker-move p-2"></div></div></div>
 
             <div id="searchSection" class="animate-fade-in-up">
+                <div class="flex items-center gap-2 mb-4 px-2"><div class="h-px bg-slate-200 flex-1"></div><span class="text-xs text-slate-400 font-bold uppercase tracking-wider">ค้นหาสินค้า</span><div class="h-px bg-slate-200 flex-1"></div></div>
                 <div class="relative max-w-xl mx-auto mb-8">
                     <input type="text" id="productCodeInput" autocomplete="off" placeholder="กรอกรหัสสินค้า..." class="w-full bg-white border-2 border-slate-100 rounded-2xl py-4 pl-12 pr-4 text-lg font-bold text-slate-700 placeholder-slate-300 focus:outline-none focus:border-sunny-red focus:ring-4 focus:ring-red-50 transition-all shadow-sm">
                     <svg class="absolute left-4 top-1/2 -translate-y-1/2 h-6 w-6 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
@@ -156,7 +238,6 @@
                 </div>
                 <div id="loadingIndicator" class="hidden flex flex-col items-center justify-center py-12"><span class="loader w-10 h-10 border-4 border-slate-200 border-t-sunny-red rounded-full mb-4"></span><span class="text-slate-400 font-bold animate-pulse">กำลังค้นหาข้อมูล...</span></div>
                 <div id="errorMessage" class="hidden text-center py-10 bg-white rounded-3xl border border-red-100 shadow-sm mx-auto max-w-sm"><div class="w-16 h-16 bg-red-50 text-red-400 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl">🤷‍♂️</div><h3 class="text-red-500 font-bold text-lg mb-1">ไม่พบข้อมูล</h3><p id="errorText" class="text-slate-400 text-sm">ลองตรวจสอบรหัสสินค้าอีกครั้ง</p></div>
-                <div id="initialMessage" class="text-center py-12 opacity-60"><div class="w-20 h-20 bg-slate-100 text-slate-300 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">🔍</div><p class="text-slate-400 font-medium">พิมพ์รหัสสินค้าเพื่อค้นหา</p><button onclick="toggleCodeListModal(true)" class="mt-2 text-sunny-red text-sm font-bold hover:underline">หรือเลือกจากรายการ</button></div>
                 <div id="productCard" class="hidden animate-fade-in-up"><div class="bg-white rounded-[2rem] p-6 md:p-8 shadow-xl border border-slate-100 relative overflow-hidden mb-6"><div class="relative z-10"><div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 border-b border-slate-100 pb-6"><div><span class="bg-slate-800 text-white px-3 py-1 rounded-lg text-xs font-bold tracking-wider mb-2 inline-block">CODE</span><h2 id="productCodeDisplay" class="text-4xl md:text-5xl font-black text-slate-800 tracking-tight"></h2><p id="productName" class="text-slate-500 text-lg mt-1 font-medium"></p></div><div class="text-right"><div class="text-xs text-slate-400 font-bold mb-1">สถานะสินค้า</div><div class="inline-flex items-center gap-2 px-4 py-2 bg-green-50 text-green-700 rounded-xl font-bold border border-green-100"><span class="w-2 h-2 rounded-full bg-green-500"></span> พร้อมจำหน่าย</div></div></div><div id="stockGrid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"></div></div></div></div>
             </div>
 
@@ -223,64 +304,7 @@
                     <div class="mt-4 flex gap-2"><button onclick="clearCalc()" class="px-4 py-2 text-red-400 hover:text-red-600 font-bold text-sm bg-red-50 rounded-xl transition-colors">ล้างข้อมูล</button><button onclick="showQuotationModal()" class="flex-1 px-4 py-2 bg-sunny-red text-white font-bold text-sm rounded-xl shadow-lg shadow-red-200 hover:bg-red-700 transition-colors btn-bounce">สร้างใบเสนอราคา</button></div>
                 </div>
             </div>
-
-            <div id="dashboardSection" class="animate-fade-in-up mt-8">
-                
-                <div class="mb-6 flex justify-between items-end">
-                    <div>
-                        <h2 class="text-2xl font-black text-slate-800">ภาพรวมระบบ</h2>
-                        <p class="text-sm text-slate-400">ยินดีต้อนรับกลับมาทำงาน!</p>
-                    </div>
-                    <div class="text-right hidden md:block">
-                        <div class="text-xs text-slate-400">วันที่ปัจจุบัน</div>
-                        <div class="font-bold text-slate-700" id="dashDate"></div>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                    <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden group hover:shadow-md transition-all">
-                        <div class="absolute right-[-10px] top-[-10px] text-6xl opacity-10 group-hover:opacity-20 transition-opacity">📄</div>
-                        <div class="text-[10px] text-slate-400 font-bold uppercase mb-1">เสนอราคา (วันนี่)</div>
-                        <div>
-                            <span class="text-3xl font-black text-sunny-red" id="dashQuoteCount">0</span>
-                            <span class="text-xs text-slate-400">ใบ</span>
-                        </div>
-                    </div>
-
-                    <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden group hover:shadow-md transition-all">
-                        <div class="absolute right-[-10px] top-[-10px] text-6xl opacity-10 group-hover:opacity-20 transition-opacity">💰</div>
-                        <div class="text-[10px] text-slate-400 font-bold uppercase mb-1">ยอดรวมโดยประมาณ</div>
-                        <div>
-                            <span class="text-xl font-black text-slate-700" id="dashTotalValue">0</span>
-                        </div>
-                    </div>
-
-                    <div class="bg-gradient-to-br from-slate-800 to-slate-700 p-4 rounded-2xl shadow-lg text-white col-span-2 relative overflow-hidden">
-                        <div class="relative z-10">
-                            <div class="text-[10px] text-slate-300 font-bold uppercase mb-1">เมนูลัด</div>
-                            <div class="flex gap-2 mt-2">
-                                <button onclick="switchCalcMode('WOOD_CALC'); document.getElementById('calculatorSection').scrollIntoView({behavior:'smooth'});" class="bg-white/10 hover:bg-white/20 px-3 py-2 rounded-lg text-xs font-bold transition-all border border-white/10">🪵 คำนวณไม้</button>
-                                <button onclick="switchCalcMode('EXT'); document.getElementById('calculatorSection').scrollIntoView({behavior:'smooth'});" class="bg-white/10 hover:bg-white/20 px-3 py-2 rounded-lg text-xs font-bold transition-all border border-white/10">☀️ ภายนอก</button>
-                            </div>
-                        </div>
-                        <div class="absolute right-2 bottom-[-10px] text-5xl opacity-20">🚀</div>
-                    </div>
-                </div>
-            </div>
             
-            <script>
-                // Script เล็กๆ สำหรับ Dashboard (ทำงานเฉพาะส่วนนี้)
-                (function(){
-                    const d = document.getElementById('dashDate');
-                    if(d) d.innerText = new Date().toLocaleDateString('th-TH', {weekday:'long', day:'numeric', month:'long'});
-                    
-                    const q = document.getElementById('dashQuoteCount');
-                    if(q) q.innerText = Math.floor(Math.random() * 5) + 1; // Mockup
-                    
-                    const t = document.getElementById('dashTotalValue');
-                    if(t) t.innerText = '฿' + (Math.floor(Math.random() * 50) + 10) + ',000'; // Mockup
-                })();
-            </script>
             <div class="mt-8 mb-6 no-print flex justify-center items-center opacity-80 hover:opacity-100 transition-opacity duration-300">
                 <img src="images/logo.png" alt="SUNNY Logo" class="h-16 w-auto object-contain">
             </div>
@@ -288,7 +312,24 @@
     </main>
 
     <div id="adminLoginModal" class="hidden fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4"><div class="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl animate-fade-in-up"><h3 class="text-xl font-bold text-slate-800 mb-4 text-center">ผู้ดูแลระบบ</h3><input type="password" id="adminPassword" class="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 mb-4 focus:ring-2 focus:ring-sunny-red focus:outline-none" placeholder="รหัสผ่าน..."><p id="loginError" class="text-red-500 text-xs mb-4 text-center hidden">รหัสผ่านไม่ถูกต้อง</p><div class="flex gap-2"><button onclick="closeAdminLogin()" class="flex-1 py-2 text-slate-400 font-bold text-sm bg-slate-100 rounded-xl hover:bg-slate-200">ยกเลิก</button><button onclick="handleLogin()" class="flex-1 py-2 bg-sunny-red text-white font-bold text-sm rounded-xl hover:bg-red-700 shadow-lg shadow-red-200">เข้าสู่ระบบ</button></div></div></div>
-    <div id="adminConfigModal" class="hidden fixed inset-0 z-[100] bg-white flex flex-col"><div class="p-4 border-b border-slate-100 flex justify-between items-center bg-white shadow-sm z-10"><h2 class="text-lg font-black text-slate-800 flex items-center gap-2"><span class="text-sunny-red">⚙️</span> ตั้งค่าระบบ</h2><div class="flex items-center gap-2"><span id="admin-mode-status" class="text-xs font-bold text-green-600 mr-2">Online</span><button onclick="saveConfig()" class="bg-sunny-red text-white px-4 py-2 rounded-lg text-sm font-bold shadow-lg shadow-red-200 hover:bg-red-700 btn-bounce">บันทึก</button><button onclick="closeConfig()" class="text-slate-400 hover:text-slate-600 px-2 text-xl">✕</button></div></div><div class="flex border-b border-slate-200 overflow-x-auto"><button id="tab-btn-menu" onclick="switchAdminTab('menu')" class="px-4 py-3 text-sm font-bold border-b-2 border-sunny-red text-sunny-red bg-red-50 whitespace-nowrap">จัดการเมนู</button><button id="tab-btn-news" onclick="switchAdminTab('news')" class="px-4 py-3 text-sm font-bold border-b-2 border-transparent text-slate-500 hover:bg-slate-50 whitespace-nowrap">ข่าวสาร</button><button id="tab-btn-calc" onclick="switchAdminTab('calc')" class="px-4 py-3 text-sm font-bold border-b-2 border-transparent text-slate-500 hover:bg-slate-50 whitespace-nowrap">สูตรคำนวณ</button><button id="tab-btn-saved" onclick="switchAdminTab('saved')" class="px-4 py-3 text-sm font-bold border-b-2 border-transparent text-slate-500 hover:bg-slate-50 whitespace-nowrap">ใบเสนอราคา</button><button id="tab-btn-theme" onclick="switchAdminTab('theme')" class="px-4 py-3 text-sm font-bold border-b-2 border-transparent text-slate-500 hover:bg-slate-50 whitespace-nowrap">ธีม</button><button id="tab-btn-features" onclick="switchAdminTab('features')" class="px-4 py-3 text-sm font-bold border-b-2 border-transparent text-slate-500 hover:bg-slate-50 whitespace-nowrap">Features</button></div><div class="flex-1 overflow-y-auto p-4 bg-slate-50 custom-scrollbar"><div id="tab-content-menu" class="space-y-4 max-w-2xl mx-auto"><div class="bg-white p-4 rounded-xl border border-slate-200"><label class="block text-xs font-bold text-slate-400 uppercase mb-2">ชื่อแอพพลิเคชัน</label><input type="text" id="conf-app-title" class="w-full p-2 border rounded font-bold text-lg text-sunny-red"></div><div id="admin-menu-list" class="space-y-3"></div></div><div id="tab-content-news" class="hidden space-y-4 max-w-3xl mx-auto"><div class="bg-white p-4 rounded-xl border border-slate-200 flex items-center justify-between"><div><label class="font-bold text-slate-700">ความเร็วตัววิ่ง</label><p class="text-xs text-slate-400">1=ช้า, 5=เร็ว</p></div><input type="range" id="conf-news-speed" min="1" max="5" class="w-32 accent-sunny-red"></div><button onclick="addNewNewsItem()" class="w-full py-3 bg-white border-2 border-dashed border-slate-300 text-slate-400 font-bold rounded-xl hover:border-sunny-red hover:text-sunny-red transition-all">+ เพิ่มประกาศใหม่</button><div id="admin-news-list" class="space-y-3"></div></div><div id="tab-content-calc" class="hidden space-y-4 max-w-xl mx-auto"></div><div id="tab-content-saved" class="hidden space-y-4 max-w-2xl mx-auto"><div class="text-xs text-slate-400 mb-2">แสดงรายการใบเสนอราคาของสมาชิกทั้งหมด (Admin View)</div><div id="saved-quotations-list" class="space-y-2"></div></div><div id="tab-content-theme" class="hidden space-y-4 max-w-2xl mx-auto"><div class="grid grid-cols-2 gap-4"><label class="cursor-pointer block"><input type="radio" name="app-theme" value="default" class="peer sr-only" onchange="previewTheme('default')"><div class="p-4 rounded-xl border-2 peer-checked:border-sunny-red peer-checked:bg-red-50 bg-white hover:bg-slate-50 transition-all text-center"><div class="text-2xl mb-2">☀️</div><div class="font-bold text-slate-700">Standard</div><div class="text-xs text-slate-400">ค่าเริ่มต้น</div></div></label><label class="cursor-pointer block"><input type="radio" name="app-theme" value="christmas" class="peer sr-only" onchange="previewTheme('christmas')"><div class="p-4 rounded-xl border-2 peer-checked:border-green-500 peer-checked:bg-green-50 bg-white hover:bg-slate-50 transition-all text-center"><div class="text-2xl mb-2">🎄</div><div class="font-bold text-green-700">Christmas</div><div class="text-xs text-slate-400">เทศกาลคริสต์มาส</div></div></label></div></div><div id="tab-content-features" class="hidden space-y-4 max-w-xl mx-auto"><div class="bg-purple-50 p-4 rounded-xl border border-purple-100 mb-4"><h3 class="font-bold text-purple-700 text-sm mb-2">🚀 Feature Flags (Experimental)</h3><div id="admin-features-list" class="space-y-2"></div></div><div class="flex gap-2"><input type="text" id="new-feature-key" placeholder="Feature Key..." class="flex-1 p-2 border rounded text-sm"><button onclick="addNewFeature()" class="bg-purple-600 text-white px-3 py-2 rounded font-bold text-xs">Add</button></div></div></div><div class="p-4 border-t border-slate-200 bg-white"><button id="logoutBtn" onclick="logoutAdmin()" class="w-full py-3 bg-slate-100 text-slate-500 font-bold rounded-xl hover:bg-slate-200 hidden">ออกจากระบบ Admin</button></div></div>
+    
+    <div id="adminConfigModal" class="hidden fixed inset-0 z-[100] bg-white flex flex-col">
+        <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-white shadow-sm z-10"><h2 class="text-lg font-black text-slate-800 flex items-center gap-2"><span class="text-sunny-red">⚙️</span> ตั้งค่าระบบ</h2><div class="flex items-center gap-2"><span id="admin-mode-status" class="text-xs font-bold text-green-600 mr-2">Online</span><button onclick="saveConfig()" class="bg-sunny-red text-white px-4 py-2 rounded-lg text-sm font-bold shadow-lg shadow-red-200 hover:bg-red-700 btn-bounce">บันทึก</button><button onclick="closeConfig()" class="text-slate-400 hover:text-slate-600 px-2 text-xl">✕</button></div></div>
+        <div class="flex border-b border-slate-200 overflow-x-auto"><button id="tab-btn-dashboard" onclick="switchAdminTab('dashboard')" class="px-4 py-3 text-sm font-bold border-b-2 border-transparent text-slate-500 hover:bg-slate-50 whitespace-nowrap">แดชบอร์ดเดิม</button><button id="tab-btn-menu" onclick="switchAdminTab('menu')" class="px-4 py-3 text-sm font-bold border-b-2 border-sunny-red text-sunny-red bg-red-50 whitespace-nowrap">จัดการเมนู</button><button id="tab-btn-news" onclick="switchAdminTab('news')" class="px-4 py-3 text-sm font-bold border-b-2 border-transparent text-slate-500 hover:bg-slate-50 whitespace-nowrap">ข่าวสาร</button><button id="tab-btn-calc" onclick="switchAdminTab('calc')" class="px-4 py-3 text-sm font-bold border-b-2 border-transparent text-slate-500 hover:bg-slate-50 whitespace-nowrap">สูตรคำนวณ</button><button id="tab-btn-saved" onclick="switchAdminTab('saved')" class="px-4 py-3 text-sm font-bold border-b-2 border-transparent text-slate-500 hover:bg-slate-50 whitespace-nowrap">ใบเสนอราคา</button><button id="tab-btn-theme" onclick="switchAdminTab('theme')" class="px-4 py-3 text-sm font-bold border-b-2 border-transparent text-slate-500 hover:bg-slate-50 whitespace-nowrap">ธีม</button><button id="tab-btn-features" onclick="switchAdminTab('features')" class="px-4 py-3 text-sm font-bold border-b-2 border-transparent text-slate-500 hover:bg-slate-50 whitespace-nowrap">Features</button></div>
+        <div class="flex-1 overflow-y-auto p-4 bg-slate-50 custom-scrollbar">
+            <div id="tab-content-dashboard" class="hidden space-y-4 max-w-4xl mx-auto">
+                <div id="oldDashboardContainer" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    </div>
+            </div>
+            <div id="tab-content-menu" class="space-y-4 max-w-2xl mx-auto"><div class="bg-white p-4 rounded-xl border border-slate-200"><label class="block text-xs font-bold text-slate-400 uppercase mb-2">ชื่อแอพพลิเคชัน</label><input type="text" id="conf-app-title" class="w-full p-2 border rounded font-bold text-lg text-sunny-red"></div><div id="admin-menu-list" class="space-y-3"></div></div>
+            <div id="tab-content-news" class="hidden space-y-4 max-w-3xl mx-auto"><div class="bg-white p-4 rounded-xl border border-slate-200 flex items-center justify-between"><div><label class="font-bold text-slate-700">ความเร็วตัววิ่ง</label><p class="text-xs text-slate-400">1=ช้า, 5=เร็ว</p></div><input type="range" id="conf-news-speed" min="1" max="5" class="w-32 accent-sunny-red"></div><button onclick="addNewNewsItem()" class="w-full py-3 bg-white border-2 border-dashed border-slate-300 text-slate-400 font-bold rounded-xl hover:border-sunny-red hover:text-sunny-red transition-all">+ เพิ่มประกาศใหม่</button><div id="admin-news-list" class="space-y-3"></div></div>
+            <div id="tab-content-calc" class="hidden space-y-4 max-w-xl mx-auto"></div>
+            <div id="tab-content-saved" class="hidden space-y-4 max-w-2xl mx-auto"><div class="text-xs text-slate-400 mb-2">แสดงรายการใบเสนอราคาของสมาชิกทั้งหมด (Admin View)</div><div id="saved-quotations-list" class="space-y-2"></div></div>
+            <div id="tab-content-theme" class="hidden space-y-4 max-w-2xl mx-auto"><div class="grid grid-cols-2 gap-4"><label class="cursor-pointer block"><input type="radio" name="app-theme" value="default" class="peer sr-only" onchange="previewTheme('default')"><div class="p-4 rounded-xl border-2 peer-checked:border-sunny-red peer-checked:bg-red-50 bg-white hover:bg-slate-50 transition-all text-center"><div class="text-2xl mb-2">☀️</div><div class="font-bold text-slate-700">Standard</div><div class="text-xs text-slate-400">ค่าเริ่มต้น</div></div></label><label class="cursor-pointer block"><input type="radio" name="app-theme" value="christmas" class="peer sr-only" onchange="previewTheme('christmas')"><div class="p-4 rounded-xl border-2 peer-checked:border-green-500 peer-checked:bg-green-50 bg-white hover:bg-slate-50 transition-all text-center"><div class="text-2xl mb-2">🎄</div><div class="font-bold text-green-700">Christmas</div><div class="text-xs text-slate-400">เทศกาลคริสต์มาส</div></div></label></div></div>
+            <div id="tab-content-features" class="hidden space-y-4 max-w-xl mx-auto"><div class="bg-purple-50 p-4 rounded-xl border border-purple-100 mb-4"><h3 class="font-bold text-purple-700 text-sm mb-2">🚀 Feature Flags (Experimental)</h3><div id="admin-features-list" class="space-y-2"></div></div><div class="flex gap-2"><input type="text" id="new-feature-key" placeholder="Feature Key..." class="flex-1 p-2 border rounded text-sm"><button onclick="addNewFeature()" class="bg-purple-600 text-white px-3 py-2 rounded font-bold text-xs">Add</button></div></div>
+        </div>
+        <div class="p-4 border-t border-slate-200 bg-white"><button id="logoutBtn" onclick="logoutAdmin()" class="w-full py-3 bg-slate-100 text-slate-500 font-bold rounded-xl hover:bg-slate-200 hidden">ออกจากระบบ Admin</button></div>
+    </div>
 
     <div id="quotationModal" class="hidden fixed inset-0 z-[100] bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
         <div class="bg-white w-full max-w-2xl rounded-none md:rounded-xl shadow-2xl overflow-hidden animate-fade-in-up my-auto">
