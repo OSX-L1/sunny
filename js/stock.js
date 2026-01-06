@@ -18,7 +18,7 @@ const ICONS = {
 let currentSystem = 'WOOD'; 
 let cache = { WOOD: null, PVC: null, ROLLER: null, ALU: null };
 let alu25Cache = { STD: null, CHAIN: null };
-let slideshowIntervals = []; 
+let slideshowIntervals = []; // Store multiple intervals for header bg
 
 // --- HELPER FUNCTIONS ---
 function isValidCode(c){if(!c||c.includes(',')||c.includes('"')||c.length>20)return false; const b=['SLAT','PCS','BOX','จำนวน','NAME','CODE','PRICE','35MM','50MM','F-WOOD','25MM','รหัส','คงเหลือ','ชื่อ','ความสูง']; return !b.some(w=>c.toUpperCase().includes(w));}
@@ -242,7 +242,6 @@ function switchSystem(system) {
     let hasImages = false;
     const slotImages = [[], [], []];
 
-    // Priority 1: User Config from Admin
     if (menu.bgImage1 || menu.bgImage2 || menu.bgImage3) {
         hasImages = true;
         if(menu.bgImage1) slotImages[0] = menu.bgImage1.split(',').map(url => url.trim()).filter(url => url !== '');
@@ -301,7 +300,6 @@ function switchSystem(system) {
         header.insertBefore(gridContainer, header.firstChild);
 
     } else {
-        // Fallback to Wooden Pattern if no images found
         header.style.backgroundImage = '';
         header.classList.remove('header-custom-bg');
         header.classList.add('wooden-pattern');
