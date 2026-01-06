@@ -1,35 +1,31 @@
 // =========================================================
-// 🚨 1. ระบบนิรภัยขั้นสูงสุด (ULTIMATE SAFETY VALVE)
-// ทำงานทันทีที่ไฟล์ถูกโหลด เพื่อบังคับลบหน้าโลโก้ภายใน 3 วินาที
+// 🚨 1. IMMEDIATE SAFETY VALVE (ทำงานทันที บรรทัดแรก)
 // =========================================================
 (function() {
-    // ตั้งเวลาบังคับลบ (Failsafe Timer)
-    var safetyTimer = setTimeout(function() {
+    // ประกาศตัวแปร Global เพื่อใช้ร่วมกัน
+    window.safetyTimerId = setTimeout(function() {
         var s = document.getElementById('intro-splash');
         if (s && document.body.contains(s)) {
-            console.warn("🛡️ Safety Valve Triggered: Forcing Splash Removal");
+            console.warn("🛡️ Safety Valve: Forcing Splash Removal (Timeout)");
             s.style.transition = 'opacity 0.5s ease';
             s.style.opacity = '0';
             s.style.pointerEvents = 'none';
             setTimeout(function() { if(s) s.remove(); }, 600);
         }
-    }, 3000); // ถ้าผ่านไป 3 วิ ยังไม่หาย ให้บังคับลบ
-    
-    // เก็บตัวแปรไว้ใช้ยกเลิกถ้าโหลดเสร็จก่อน
-    window.safetyTimerId = safetyTimer;
+    }, 3500); // 3.5 วินาที
 })();
 
 // =========================================
-// 2. GLOBAL VARIABLES & PLACEHOLDERS
+// 2. GLOBAL VARIABLES
 // =========================================
 const EMOJI_LIST = ['📢', '🔥', '✨', '🎉', '✅', '❌', '🟢', '🔴', '📅', '🕒', '📌', '📍', '📦', '🛒', '💬', '📞', '🏠', '⚙️', '💰', '❤️', '⭐', '🆕'];
 let tempConfig = {}; 
 
-// ป้องกัน Error หากไฟล์อื่นโหลดยังไม่เสร็จ
+// Placeholder Functions (กัน Error)
 function setupAutocomplete() {} 
-function switchSystem() { console.log('Waiting for stock system...'); } 
+function switchSystem() {} 
 function insertEmoji() {}
-function switchCalcMode() { console.log('Waiting for calculator...'); }
+function switchCalcMode() {}
 function saveCurrentQuotation() {}
 function captureQuotation() {}
 function closeQuotation() {}
@@ -40,62 +36,50 @@ function addCalcItem() {}
 function showQuotationModal() {}
 
 // =========================================
-// 3. MAIN INITIALIZATION (ทำงานเมื่อหน้าเว็บโหลดเสร็จ)
+// 3. MAIN INIT LOGIC
 // =========================================
 window.addEventListener('DOMContentLoaded', () => {
-    console.log("⚡ DOMContentLoaded: Starting initialization...");
+    console.log("⚡ DOM Loaded");
 
-    // 3.1 พยายามลบหน้าโลโก้แบบปกติ (Normal Removal)
-    const removeSplashNormally = () => {
-        const s = document.getElementById('intro-splash');
-        if(s && document.body.contains(s)) {
-             // ยกเลิกตัวจับเวลานิรภัย เพราะเรากำลังจะลบแบบปกติแล้ว
-             if(window.safetyTimerId) clearTimeout(window.safetyTimerId);
-             
-             s.style.transition = "opacity 0.7s ease-out";
-             s.style.opacity = '0';
-             s.style.pointerEvents = 'none';
-             setTimeout(() => { if(s) s.remove(); }, 800);
-        }
-    };
+    // 1. Init System
+    try {
+        if(typeof initFirebase === 'function') initFirebase();
+        // Init Dashboard Mockup Data
+        updateDashboardData();
+    } catch(e) { console.error("Init Error:", e); }
 
-    // 3.2 เริ่มต้นระบบต่างๆ (ใช้ try-catch เพื่อไม่ให้ระบบค้างหากมี error)
-    // ทำงานหลังจากหน่วงเวลาเล็กน้อยเพื่อให้ UI นิ่ง
+    // 2. Start Normal Mode
+    initNormalMode();
+
+    // 3. REMOVE SPLASH SCREEN (Normal Removal)
+    // ยกเลิกตัวจับเวลา Safety Valve เพราะโหลดเสร็จแล้ว
+    if(window.safetyTimerId) clearTimeout(window.safetyTimerId);
+
     setTimeout(() => {
-        // A. Init Firebase
-        try {
-            if(typeof initFirebase === 'function') {
-                initFirebase();
-            } else {
-                console.warn("Firebase init function not found.");
-            }
-        } catch(e) { console.error("Firebase Init Error:", e); }
-
-        // B. Init Dashboard UI
-        try {
-            updateDashboardData();
-        } catch(e) { console.error("Dashboard Init Error:", e); }
-
-        // C. Init Sidebar & Default Mode
-        try {
-            renderSidebar();
-            // รออีกนิดค่อยโหลดข้อมูลหนักๆ
-            setTimeout(() => {
-                if(typeof switchSystem === 'function') switchSystem('WOOD');
-                if(typeof renderNews === 'function') renderNews();
-                if(typeof currentUser !== 'undefined') renderUserSidebar(currentUser);
-                if(typeof checkPwaStatus === 'function') checkPwaStatus();
-            }, 300);
-        } catch(e) { console.error("Normal Mode Init Error:", e); }
-
-        // D. สุดท้าย สั่งลบหน้าโลโก้แบบปกติ
-        removeSplashNormally();
-
-    }, 200); // หน่วงเวลาเริ่มต้น 0.2 วินาที
+        const s = document.getElementById('intro-splash');
+        if(s) {
+            console.log("✅ Normal Splash Removal");
+            s.style.transition = "opacity 0.5s ease";
+            s.style.opacity = '0';
+            setTimeout(() => { if(s) s.remove(); }, 500);
+        }
+    }, 500); // รอ 0.5 วิ เพื่อความนุ่มนวล
 });
 
+function initNormalMode() {
+    renderSidebar();
+    
+    setTimeout(() => {
+        // Load default content
+        if(typeof switchSystem === 'function') switchSystem('WOOD');
+        if(typeof renderNews === 'function') renderNews();
+        if(typeof currentUser !== 'undefined') renderUserSidebar(currentUser);
+        if(typeof checkPwaStatus === 'function') checkPwaStatus();
+    }, 100);
+}
+
 // =========================================
-// 4. UI HELPERS & FUNCTIONS
+// 4. UI HELPERS
 // =========================================
 function showToast(msg) { 
     const t = document.getElementById('toast');
@@ -108,15 +92,15 @@ function showToast(msg) {
 }
 
 function updateDashboardData() {
-    const elDate = document.getElementById('dashTime');
-    if(elDate) elDate.innerText = new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute:'2-digit'});
+    // Mockup Data for Dashboard
+    const d = document.getElementById('dashTime');
+    if(d) d.innerText = new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute:'2-digit'});
     
-    // Mockup Data (สามารถเปลี่ยนเป็นข้อมูลจริงจาก Firebase ได้ภายหลัง)
-    const elQuote = document.getElementById('dashTotalQuote');
-    if(elQuote) elQuote.innerText = Math.floor(Math.random() * 20) + 5;
+    const q = document.getElementById('dashTotalQuote');
+    if(q) q.innerText = Math.floor(Math.random() * 20) + 5;
     
-    const elMoney = document.getElementById('dashTotalMoney');
-    if(elMoney) elMoney.innerText = '฿' + (Math.floor(Math.random() * 50) + 10) + 'k';
+    const m = document.getElementById('dashTotalMoney');
+    if(m) m.innerText = '฿' + (Math.floor(Math.random() * 50) + 10) + 'k';
 }
 
 function renderSidebar() {
@@ -124,6 +108,7 @@ function renderSidebar() {
     if (!c) return;
     
     const menus = (typeof appConfig !== 'undefined' && appConfig.menus) ? appConfig.menus : [];
+    
     let html = `<div class="px-6 mb-3 text-xs font-bold text-slate-400 uppercase tracking-wider">เช็คสต็อกสินค้า</div>`;
     
     menus.forEach(m => {
@@ -140,6 +125,7 @@ function renderSidebar() {
         html += `<div class="px-6 mt-6 mb-3 text-xs font-bold text-slate-400 uppercase tracking-wider">ระบบคำนวณราคา</div>`;
         const cls = "flex items-center px-6 py-3 text-slate-600 hover:bg-indigo-50 border-l-4 border-transparent hover:border-indigo-900 transition-all";
         const i = `<svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 4h6m-6 4h6M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>`;
+        
         html += `
             <a href="#" onclick="switchCalcMode('EXT')" class="${cls}">${i}<span>ม่านม้วนภายนอก</span></a>
             <a href="#" onclick="switchCalcMode('INT')" class="${cls}">${i}<span>ม่านม้วน (ภายใน)</span></a>
@@ -188,31 +174,25 @@ function logoutAdmin() { localStorage.removeItem('isAdminLoggedIn'); closeConfig
 function openConfig() {
     tempConfig = JSON.parse(JSON.stringify(appConfig));
     document.getElementById('adminConfigModal').classList.remove('hidden');
-    renderOldDashboardInAdmin(); // แสดง Dashboard เก่าใน Admin
+    renderOldDashboardInAdmin();
     const titleInp = document.getElementById('conf-app-title'); if(titleInp) titleInp.value = tempConfig.appTitle;
     const speedInp = document.getElementById('conf-news-speed'); if(speedInp) speedInp.value = tempConfig.newsSettings.speed || 3;
     document.getElementById('logoutBtn').classList.remove('hidden');
     renderAdminCalcInputs(); 
-    switchAdminTab('dashboard'); // เปิดแท็บ Dashboard ก่อน
+    switchAdminTab('dashboard'); 
 }
 
-// แสดง Dashboard แบบเก่าในหน้า Admin
 function renderOldDashboardInAdmin() {
     const c = document.getElementById('oldDashboardContainer');
     if(!c) return;
-    // จำลองข้อมูลสำหรับหน้า Admin
     c.innerHTML = `
         <div class="bg-white p-4 rounded-xl border shadow-sm">
-            <div class="text-xs text-slate-400 font-bold uppercase">ใบเสนอราคา (Old View)</div>
+            <div class="text-xs text-slate-400 font-bold uppercase">ใบเสนอราคา (Old)</div>
             <div class="text-3xl font-black text-sunny-red mt-2">42</div>
         </div>
         <div class="bg-white p-4 rounded-xl border shadow-sm">
-            <div class="text-xs text-slate-400 font-bold uppercase">ยอดรวม (Old View)</div>
+            <div class="text-xs text-slate-400 font-bold uppercase">ยอดรวม (Old)</div>
             <div class="text-3xl font-black text-slate-700 mt-2">฿1.2M</div>
-        </div>
-        <div class="bg-slate-800 p-4 rounded-xl text-white col-span-2 flex items-center justify-between">
-            <div><div class="text-xs opacity-50 font-bold uppercase">สินค้ามาแรง</div><div class="font-bold text-xl mt-1">มู่ลี่ไม้ Basswood</div></div>
-            <div class="text-4xl opacity-20">🏆</div>
         </div>
     `;
 }
