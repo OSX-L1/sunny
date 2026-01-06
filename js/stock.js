@@ -8,8 +8,7 @@ const ALU_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQz2OtjzRBm
 const ALU25_STD_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQz2OtjzRBmeUmLOTSgJ-Bt2woZPiR9QyzvIWcBXacheG3IplefFZE66yWYE43qVRQo2DAOPu9UClh5/pub?gid=684509454&single=true&output=csv";
 const ALU25_CHAIN_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQz2OtjzRBmeUmLOTSgJ-Bt2woZPiR9QyzvIWcBXacheG3IplefFZE66yWYE43qVRQo2DAOPu9UClh5/pub?gid=374964719&single=true&output=csv";
 
-// --- DEFAULT BACKGROUND IMAGES (FALLBACK) ---
-// ส่วนนี้คือส่วนสำคัญที่หายไป ทำให้ภาพไม่แสดงครับ
+// --- DEFAULT BACKGROUND IMAGES (ภาพสำรองสำหรับกันจอขาว) ---
 const DEFAULT_BGS = {
     WOOD: [
         'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=800&q=80',
