@@ -8,6 +8,30 @@ const ALU_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQz2OtjzRBm
 const ALU25_STD_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQz2OtjzRBmeUmLOTSgJ-Bt2woZPiR9QyzvIWcBXacheG3IplefFZE66yWYE43qVRQo2DAOPu9UClh5/pub?gid=684509454&single=true&output=csv";
 const ALU25_CHAIN_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQz2OtjzRBmeUmLOTSgJ-Bt2woZPiR9QyzvIWcBXacheG3IplefFZE66yWYE43qVRQo2DAOPu9UClh5/pub?gid=374964719&single=true&output=csv";
 
+// --- DEFAULT BACKGROUND IMAGES (FALLBACK) ---
+const DEFAULT_BGS = {
+    WOOD: [
+        'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=800&q=80',
+        'https://images.unsplash.com/photo-1595429035839-c99c298ffdde?auto=format&fit=crop&w=800&q=80',
+        'https://images.unsplash.com/photo-1540518614846-7eded433c457?auto=format&fit=crop&w=800&q=80'
+    ],
+    ALU: [
+        'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=800&q=80',
+        'https://images.unsplash.com/photo-1497215728101-856f4ea42174?auto=format&fit=crop&w=800&q=80',
+        'https://images.unsplash.com/photo-1542382257-80dedb725088?auto=format&fit=crop&w=800&q=80'
+    ],
+    PVC: [
+        'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=800&q=80',
+        'https://images.unsplash.com/photo-1600566752355-35792bedcfe1?auto=format&fit=crop&w=800&q=80',
+        'https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=800&q=80'
+    ],
+    ROLLER: [
+        'https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=800&q=80',
+        'https://images.unsplash.com/photo-1615873968403-89e068629265?auto=format&fit=crop&w=800&q=80',
+        'https://images.unsplash.com/photo-1507089947368-19c1da9775ae?auto=format&fit=crop&w=800&q=80'
+    ]
+};
+
 const ICONS = {
     wood: '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>',
     alu: '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>',
@@ -18,7 +42,7 @@ const ICONS = {
 let currentSystem = 'WOOD'; 
 let cache = { WOOD: null, PVC: null, ROLLER: null, ALU: null };
 let alu25Cache = { STD: null, CHAIN: null };
-let slideshowIntervals = []; // Store multiple intervals for header bg
+let slideshowIntervals = []; 
 
 // --- HELPER FUNCTIONS ---
 function isValidCode(c){if(!c||c.includes(',')||c.includes('"')||c.length>20)return false; const b=['SLAT','PCS','BOX','จำนวน','NAME','CODE','PRICE','35MM','50MM','F-WOOD','25MM','รหัส','คงเหลือ','ชื่อ','ความสูง']; return !b.some(w=>c.toUpperCase().includes(w));}
@@ -242,6 +266,7 @@ function switchSystem(system) {
     let hasImages = false;
     const slotImages = [[], [], []];
 
+    // Priority 1: User Config from Admin
     if (menu.bgImage1 || menu.bgImage2 || menu.bgImage3) {
         hasImages = true;
         if(menu.bgImage1) slotImages[0] = menu.bgImage1.split(',').map(url => url.trim()).filter(url => url !== '');
@@ -255,6 +280,14 @@ function switchSystem(system) {
              if(slotImages[1].length === 0 && images[0]) slotImages[1].push(images[0]);
              if(slotImages[2].length === 0 && images[0]) slotImages[2].push(images[0]);
         }
+    } 
+    // Priority 2: Fallback to DEFAULT_BGS (Added back to fix white screen)
+    else if (typeof DEFAULT_BGS !== 'undefined' && DEFAULT_BGS[system]) {
+        hasImages = true;
+        const defaults = DEFAULT_BGS[system];
+        slotImages[0] = [defaults[0]];
+        slotImages[1] = [defaults[1]];
+        slotImages[2] = [defaults[2]];
     }
 
     if (hasImages) {
