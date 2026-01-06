@@ -15,52 +15,75 @@ function switchCalcMode(mode) {
 
 function openCalculator(mode) {
     calcMode = mode;
-    document.getElementById('searchSection').classList.add('hidden');
-    document.getElementById('calculatorSection').classList.remove('hidden');
+    const searchSection = document.getElementById('searchSection');
+    const calcSection = document.getElementById('calculatorSection');
+    
+    // Safety check for elements
+    if (searchSection) searchSection.classList.add('hidden');
+    if (calcSection) calcSection.classList.remove('hidden');
     
     const titleText = document.getElementById('calcTitleText');
     const titleIcon = document.getElementById('calcTitleIcon');
     const priceInput = document.getElementById('calcPrice');
-    const sysSelect = document.getElementById('calcSystemSelectContainer');
+    const sysSelect = document.getElementById('calcSystemSelectContainer'); // ของ ALU
+    const woodSelect = document.getElementById('calcWoodSelectContainer'); // ของ WOOD
 
-    if (mode === 'EXT') {
-        titleText.innerText = 'คำนวณม่านม้วนภายนอก';
-        titleIcon.innerText = '🪟';
-        sysSelect.classList.add('hidden');
+    // Reset visibility if elements exist
+    if(sysSelect) sysSelect.classList.add('hidden');
+    if(woodSelect) woodSelect.classList.add('hidden');
+    
+    if (priceInput) {
         priceInput.readOnly = false;
-        priceInput.placeholder = "ระบุราคา";
         priceInput.value = "";
-    } else if (mode === 'INT') {
-        titleText.innerText = 'คำนวณราคาม่านม้วน';
-        titleIcon.innerText = '🏠';
-        sysSelect.classList.add('hidden');
-        priceInput.readOnly = false;
-        priceInput.placeholder = "ระบุราคา";
-        priceInput.value = "";
-    } else if (mode === 'PVC_CALC') {
-        titleText.innerText = 'คำนวณฉากกั้นห้อง PVC';
-        titleIcon.innerText = '🚪';
-        sysSelect.classList.add('hidden');
-        priceInput.readOnly = false;
-        priceInput.placeholder = "ระบุราคา/ตร.ล.";
-        priceInput.value = "";
-    } else if (mode === 'ALU25') {
-        titleText.innerText = 'คำนวณมู่ลี่อลูมิเนียม 25mm.';
-        titleIcon.innerText = '📏';
-        sysSelect.classList.remove('hidden');
-        priceInput.readOnly = true;
-        priceInput.placeholder = "รอค้นหาอัตโนมัติ...";
-        priceInput.value = "";
-        if(typeof loadAlu25PriceData === 'function') loadAlu25PriceData();
+    }
+
+    if (titleText && titleIcon) {
+        if (mode === 'EXT') {
+            titleText.innerText = 'คำนวณม่านม้วนภายนอก';
+            titleIcon.innerText = '🪟';
+            if(priceInput) priceInput.placeholder = "ระบุราคา";
+        } else if (mode === 'INT') {
+            titleText.innerText = 'คำนวณราคาม่านม้วน';
+            titleIcon.innerText = '🏠';
+            if(priceInput) priceInput.placeholder = "ระบุราคา";
+        } else if (mode === 'PVC_CALC') {
+            titleText.innerText = 'คำนวณฉากกั้นห้อง PVC';
+            titleIcon.innerText = '🚪';
+            if(priceInput) priceInput.placeholder = "ระบุราคา/ตร.ล.";
+        } else if (mode === 'WOOD_CALC') {
+            titleText.innerText = 'คำนวณมู่ลี่ไม้';
+            titleIcon.innerText = '🪵';
+            if(woodSelect) woodSelect.classList.remove('hidden');
+            if(priceInput) priceInput.placeholder = "ว่างไว้เพื่อใช้ราคามาตรฐาน"; 
+        } else if (mode === 'ALU25') {
+            titleText.innerText = 'คำนวณมู่ลี่อลูมิเนียม 25mm.';
+            titleIcon.innerText = '📏';
+            if(sysSelect) sysSelect.classList.remove('hidden');
+            if(priceInput) {
+                priceInput.readOnly = true;
+                priceInput.placeholder = "รอค้นหาอัตโนมัติ...";
+            }
+            if(typeof loadAlu25PriceData === 'function') loadAlu25PriceData();
+        }
     }
 
     renderCalcTable();
 }
 
 function addCalcItem() {
-    const wInput = parseFloat(document.getElementById('calcW').value);
-    const hInput = parseFloat(document.getElementById('calcH').value);
-    const qty = parseInt(document.getElementById('calcQty').value) || 1;
+    const wInputEl = document.getElementById('calcW');
+    const hInputEl = document.getElementById('calcH');
+    const qtyInputEl = document.getElementById('calcQty');
+    const priceInputEl = document.getElementById('calcPrice');
+
+    if (!wInputEl || !hInputEl) {
+        alert("ไม่พบช่องกรอกข้อมูล กรุณารีเฟรชหน้าเว็บ");
+        return;
+    }
+
+    const wInput = parseFloat(wInputEl.value);
+    const hInput = parseFloat(hInputEl.value);
+    const qty = parseInt(qtyInputEl.value) || 1;
     
     if(!wInput || !hInput) { alert('กรุณากรอกความกว้างและความสูง'); return; }
 
@@ -72,30 +95,62 @@ function addCalcItem() {
     let displayUnit = 'm';
     let systemLabel = '';
 
-    // --- PVC Partition Logic ---
-    if (calcMode === 'PVC_CALC') {
-        price = parseFloat(document.getElementById('calcPrice').value);
+    // แปลงหน่วยพื้นฐานเป็นเมตร
+    let wM = (wInput >= 10) ? wInput / 100 : wInput;
+    let hM = (hInput >= 10) ? hInput / 100 : hInput;
+    
+    // Config values (with fallbacks)
+    const woodConf = (appConfig.calcSettings && appConfig.calcSettings.wood) ? appConfig.calcSettings.wood : { priceBasswood: 789, priceFoamwood: 750, factor: 1.2, maxW: 2.40, minW: 0.80, minH: 1.00 };
+    const pvcConf = (appConfig.calcSettings && appConfig.calcSettings.pvc) ? appConfig.calcSettings.pvc : { factor: 1.2, minW: 1.00, stepStartH: 2.00 };
+    const rollerConf = (appConfig.calcSettings && appConfig.calcSettings.roller) ? appConfig.calcSettings.roller : { fabricMult: 1.2, minArea: 1.2, eqExt: 1956, railTop: 200, railBot: 150, sling: 69 };
+
+    // --- 1. WOODEN BLINDS Logic ---
+    if (calcMode === 'WOOD_CALC') {
+        if (wM > woodConf.maxW) {
+            const confirmCalc = confirm(`คำเตือน: มู่ลี่ไม้ทำความกว้างได้สูงสุดที่ ${woodConf.maxW.toFixed(2)} เมตรเท่านั้น\n\nคุณกรอกมา: ${wM.toFixed(2)} เมตร\n\nกด [ตกลง] เพื่อคำนวณราคาตามขนาดเดิม\nกด [ยกเลิก] เพื่อแก้ไขขนาด`);
+            if (!confirmCalc) return; 
+        }
+
+        const woodTypeEl = document.querySelector('input[name="woodType"]:checked');
+        const woodType = woodTypeEl ? woodTypeEl.value : 'BASSWOOD'; // Default fallback
+        const userPrice = parseFloat(priceInputEl.value);
+        
+        let defaultPrice = (woodType === 'BASSWOOD') ? woodConf.priceBasswood : woodConf.priceFoamwood;
+        price = userPrice || defaultPrice; 
+
+        systemLabel = `มู่ลี่ไม้ (${woodType === 'BASSWOOD' ? 'Basswood' : 'Foamwood'})`;
+        displayUnit = 'm';
+
+        let adjustW = (wM < woodConf.minW) ? woodConf.minW : wM;
+        let adjustH = (hM < woodConf.minH) ? woodConf.minH : hM;
+
+        finalW = wM.toFixed(2);
+        finalH = hM.toFixed(2);
+
+        const area = adjustW * adjustH * woodConf.factor;
+        totalPerSet = area * price;
+
+        details = `ขนาดจริง: ${finalW} x ${finalH} ม.<br>
+                   เรทคำนวณ: ${adjustW.toFixed(2)} x ${adjustH.toFixed(2)} ม. (ขั้นต่ำ ${woodConf.minW}x${woodConf.minH})<br>
+                   พื้นที่: ${area.toFixed(2)} ตร.ล. (x${woodConf.factor})<br>
+                   ราคา: ${area.toFixed(2)} x ${price.toLocaleString()} = ${totalPerSet.toLocaleString()} บ.
+                   ${userPrice ? '<br>(กำหนดราคาเอง)' : ''}`;
+    }
+
+    // --- 2. PVC Partition Logic ---
+    else if (calcMode === 'PVC_CALC') {
+        price = parseFloat(priceInputEl.value);
         if(!price) { alert('กรุณาระบุราคา'); return; }
         
         systemLabel = 'ฉากกั้นห้อง PVC';
         displayUnit = 'm';
-
-        // แปลงหน่วยเป็นเมตร (ถ้ากรอกมาเกิน 10 สันนิษฐานว่าเป็น cm)
-        let wM = (wInput >= 10) ? wInput / 100 : wInput;
-        let hM = (hInput >= 10) ? hInput / 100 : hInput;
         
-        // --- ส่วนแสดงผล (ใช้ค่าจริงที่ลูกค้ากรอก) ---
         finalW = wM.toFixed(2);
         finalH = hM.toFixed(2);
 
-        // --- ส่วนคำนวณ (Calculated Variables) ---
-        
-        // 1. ความกว้างขั้นต่ำ 1.00 ม.
-        let adjustW = (wM < 1.00) ? 1.00 : wM;
+        let adjustW = (wM < pvcConf.minW) ? pvcConf.minW : wM;
 
-        // 2. ความสูงปรับ Step (ตามเงื่อนไขที่กำหนด)
-        let adjustH = 2.00; // เริ่มต้นที่ 2.00
-        
+        let adjustH = pvcConf.stepStartH; 
         if (hM <= 2.01) adjustH = 2.00;
         else if (hM <= 2.21) adjustH = 2.20;
         else if (hM <= 2.41) adjustH = 2.40;
@@ -103,18 +158,18 @@ function addCalcItem() {
         else if (hM <= 2.81) adjustH = 2.80;
         else if (hM <= 3.01) adjustH = 3.00;
         else if (hM <= 3.31) adjustH = 3.30;
-        else adjustH = 3.50; // Max cap (3.32 - 3.50)
+        else adjustH = 3.50; 
 
-        // สูตร: กว้าง(ปรับ) x สูง(ปรับ) x 1.2 x ราคา
-        const area = adjustW * adjustH * 1.2;
+        const area = adjustW * adjustH * pvcConf.factor;
         totalPerSet = area * price;
 
         details = `ขนาดจริง: ${finalW} x ${finalH} ม.<br>
                    เรทคำนวณ: ${adjustW.toFixed(2)} x ${adjustH.toFixed(2)} ม.<br>
-                   พื้นที่: ${area.toFixed(2)} ตร.ล. (รวมคูณ 1.2)<br>
+                   พื้นที่: ${area.toFixed(2)} ตร.ล. (รวมคูณ ${pvcConf.factor})<br>
                    ราคา: ${area.toFixed(2)} x ${price.toLocaleString()} = ${totalPerSet.toLocaleString()} บ.`;
     }
-    // --- ALU 25 Logic ---
+
+    // --- 3. ALU 25 Logic ---
     else if (calcMode === 'ALU25') {
         const roundCustom = (val) => Math.round(val / 10) * 10;
         let lookupW = roundCustom(wInput);
@@ -125,8 +180,9 @@ function addCalcItem() {
         displayUnit = 'cm';
 
         const key = `${lookupW}*${lookupH}`;
-        const sysType = document.querySelector('input[name="aluSystem"]:checked').value;
-        const db = sysType === 'STD' ? alu25Cache.STD : alu25Cache.CHAIN;
+        const sysTypeEl = document.querySelector('input[name="aluSystem"]:checked');
+        const sysType = sysTypeEl ? sysTypeEl.value : 'STD';
+        const db = sysType === 'STD' ? (typeof alu25Cache !== 'undefined' ? alu25Cache.STD : null) : (typeof alu25Cache !== 'undefined' ? alu25Cache.CHAIN : null);
 
         systemLabel = sysType === 'STD' ? 'มู่ลี่อลูมิเนียม (ธรรมดา)' : 'มู่ลี่อลูมิเนียม (โซ่วน)';
 
@@ -138,49 +194,65 @@ function addCalcItem() {
         price = db[key];
         totalPerSet = price;
         details = `ขนาดจริง: ${wInput}x${hInput} cm<br>ปรับขนาดคำนวณ: ${lookupW}x${lookupH} cm<br>ระบบ: ${sysType==='STD'?'ธรรมดา':'โซ่วน'}<br>ราคาตามตาราง: ${price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} บ.`;
-        document.getElementById('calcPrice').value = price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        if(priceInputEl) priceInputEl.value = price.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
 
     } 
-    // --- Roller / Ext Logic ---
+    
+    // --- 4. Roller / Ext Logic ---
     else {
-        price = parseFloat(document.getElementById('calcPrice').value);
+        price = parseFloat(priceInputEl.value);
         if(!price) { alert('กรุณาระบุราคา'); return; }
 
         systemLabel = calcMode === 'EXT' ? 'ม่านม้วนภายนอก' : 'ม่านม้วน';
 
-        const wM = (wInput >= 10) ? wInput / 100 : wInput;
-        const hM = (hInput >= 10) ? hInput / 100 : hInput;
         finalW = wM.toFixed(2);
         finalH = hM.toFixed(2);
         displayUnit = 'm';
 
-        const f = appConfig.calcSettings.factors;
-        let rawArea = wM * hM * f.fabricMult;
-        let finalArea = rawArea < f.minArea ? f.minArea : rawArea;
+        let rawArea = wM * hM * rollerConf.fabricMult;
+        let finalArea = rawArea < rollerConf.minArea ? rollerConf.minArea : rawArea;
         let fabricCost = finalArea * price;
 
         if(calcMode === 'EXT') {
-            const topRail = wM * f.railTop;
-            const botRail = wM * f.railBot;
-            const sling = hM * f.sling * 2;
-            totalPerSet = fabricCost + f.eqExt + topRail + botRail + sling;
-            details = `ราคาผ้า: ${finalW}x${finalH}x${f.fabricMult} = ${rawArea.toFixed(2)} ${rawArea<f.minArea?`(ปรับเป็น ${f.minArea})`:''} x ${price} = ${fabricCost.toLocaleString()} บ.<br>ค่าอุปกรณ์: ${f.eqExt.toLocaleString()} บ.<br>รางบน: ${finalW}x${f.railTop} = ${topRail.toLocaleString()} บ.<br>รางล่าง: ${finalW}x${f.railBot} = ${botRail.toLocaleString()} บ.<br>สลิง: ${finalH}x${f.sling}x2 = ${sling.toLocaleString()} บ.`;
+            const topRail = wM * rollerConf.railTop;
+            const botRail = wM * rollerConf.railBot;
+            const sling = hM * rollerConf.sling * 2;
+            totalPerSet = fabricCost + rollerConf.eqExt + topRail + botRail + sling;
+            details = `ราคาผ้า: ${finalW}x${finalH}x${rollerConf.fabricMult} = ${rawArea.toFixed(2)} ${rawArea<rollerConf.minArea?`(ปรับเป็น ${rollerConf.minArea})`:''} x ${price} = ${fabricCost.toLocaleString()} บ.<br>ค่าอุปกรณ์: ${rollerConf.eqExt.toLocaleString()} บ.<br>รางบน: ${finalW}x${rollerConf.railTop} = ${topRail.toLocaleString()} บ.<br>รางล่าง: ${finalW}x${rollerConf.railBot} = ${botRail.toLocaleString()} บ.<br>สลิง: ${finalH}x${rollerConf.sling}x2 = ${sling.toLocaleString()} บ.`;
         } else {
             totalPerSet = fabricCost;
-            details = `ราคาผ้า: ${finalW}x${finalH}x${f.fabricMult} = ${rawArea.toFixed(2)} ${rawArea<f.minArea?`(ปรับเป็น ${f.minArea})`:''} x ${price} = ${fabricCost.toLocaleString()} บ.`;
+            details = `ราคาผ้า: ${finalW}x${finalH}x${rollerConf.fabricMult} = ${rawArea.toFixed(2)} ${rawArea<rollerConf.minArea?`(ปรับเป็น ${rollerConf.minArea})`:''} x ${price} = ${fabricCost.toLocaleString()} บ.`;
         }
     }
     
     const grandTotal = totalPerSet * qty;
+    
+    // Push to array and render
     calcItems.push({ w: finalW, h: finalH, unit: displayUnit, price: price, qty: qty, totalPerSet: totalPerSet, grandTotal: grandTotal, details: details, label: systemLabel });
+    
+    console.log("Added Item:", calcItems); // Debug Log
+    
     renderCalcTable();
-    document.getElementById('calcW').value = '';
-    document.getElementById('calcH').value = '';
-    if(calcMode !== 'ALU25') document.getElementById('calcPrice').value = ''; 
+    
+    // Clear inputs
+    if(wInputEl) wInputEl.value = '';
+    if(hInputEl) hInputEl.value = '';
+    if(calcMode !== 'ALU25' && calcMode !== 'WOOD_CALC' && priceInputEl) priceInputEl.value = ''; 
+    if(calcMode === 'WOOD_CALC' && priceInputEl) priceInputEl.value = '';
 }
 
 function renderCalcTable() {
+    // This logic is now handled in ui.js to support responsive design
+    // But we keep basic logic here as fallback or for data processing
+    if(typeof window.renderCalcTable === 'function' && window.renderCalcTable !== renderCalcTable) {
+        // If ui.js overrides this, let it handle rendering
+        return; 
+    }
+    
+    // Fallback rendering (Standard Table)
     const tbody = document.getElementById('calcTableBody');
+    if(!tbody) return;
+    
     tbody.innerHTML = '';
     let sum = 0;
     calcItems.forEach((item, idx) => {
@@ -197,11 +269,18 @@ function renderCalcTable() {
                 <td class="px-3 py-3 text-right"><button onclick="removeCalcItem(${idx})" class="text-red-300 hover:text-red-500 btn-bounce">x</button></td>
             </tr>`;
     });
-    document.getElementById('totalItems').innerText = calcItems.length;
-    document.getElementById('grandTotal').innerText = sum.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    
+    const totalItemsEl = document.getElementById('totalItems');
+    const grandTotalEl = document.getElementById('grandTotal');
+    
+    if(totalItemsEl) totalItemsEl.innerText = calcItems.length;
+    if(grandTotalEl) grandTotalEl.innerText = sum.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
 }
 
-function removeCalcItem(idx) { calcItems.splice(idx, 1); renderCalcTable(); }
+function removeCalcItem(idx) { 
+    calcItems.splice(idx, 1); 
+    renderCalcTable(); 
+}
 
 function clearCalc() { 
     calcItems = []; 
@@ -210,32 +289,62 @@ function clearCalc() {
     renderCalcTable(); 
 }
 
-// --- QUOTATION MODAL ---
+// --- QUOTATION MODAL (FIXED & DEBUGGED) ---
 function showQuotationModal() {
-    if(calcItems.length === 0) { alert('ไม่มีรายการคำนวณ'); return; }
-    document.getElementById('quotationModal').classList.remove('hidden');
-    document.getElementById('qDate').innerText = new Date().toLocaleDateString('th-TH');
+    console.log("Checking quotation items...", calcItems);
+
+    // 1. Check if items exist
+    if (!calcItems || calcItems.length === 0) { 
+        alert('กรุณาเพิ่มรายการคำนวณก่อนสร้างใบเสนอราคา'); 
+        return; 
+    }
+
+    // 2. Check Modal Element
+    const modal = document.getElementById('quotationModal');
+    if (!modal) {
+        console.error("Critical Error: element #quotationModal not found in HTML");
+        alert("ระบบขัดข้อง: ไม่พบหน้าต่างใบเสนอราคา");
+        return;
+    }
+
+    // 3. Show Modal
+    modal.classList.remove('hidden');
+    
+    // 4. Update Header Info
+    const dateEl = document.getElementById('qDate');
+    if(dateEl) dateEl.innerText = new Date().toLocaleDateString('th-TH');
     
     let typeLabel = 'ใบเสนอราคา'; 
     if(calcMode === 'EXT') typeLabel = 'ม่านม้วนภายนอก';
     else if(calcMode === 'PVC_CALC') typeLabel = 'ฉากกั้นห้อง PVC';
+    else if(calcMode === 'WOOD_CALC') typeLabel = 'มู่ลี่ไม้';
     else if(calcMode === 'ALU25') typeLabel = 'มู่ลี่อลูมิเนียม';
     else typeLabel = 'ม่านม้วน';
     
-    document.getElementById('qType').innerText = typeLabel;
+    const typeEl = document.getElementById('qType');
+    if(typeEl) typeEl.innerText = typeLabel;
     
+    // 5. Render Items inside Modal
     const tbody = document.getElementById('qBody');
     const detailContent = document.getElementById('qDetailContent');
-    tbody.innerHTML = '';
-    detailContent.innerHTML = '';
+    const grandTotalEl = document.getElementById('qGrandTotal');
+
+    if (tbody) tbody.innerHTML = '';
+    if (detailContent) detailContent.innerHTML = '';
+    
     let sum = 0;
     
     calcItems.forEach((item, idx) => {
         sum += item.grandTotal;
-        tbody.innerHTML += `<tr><td class="py-2"><span class="font-bold">ชุดที่ ${idx+1}</span> <span class="text-xs text-slate-500 ml-2">(${item.w}x${item.h} ${item.unit})</span><div class="text-xs text-slate-400">${item.label || ''}</div></td><td class="py-2 text-center">${item.qty}</td><td class="py-2 text-right">${item.totalPerSet.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td><td class="py-2 text-right font-bold">${item.grandTotal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td></tr>`;
-        detailContent.innerHTML += `<div class="border-b border-slate-200 pb-2 last:border-0"><span class="font-bold text-sunny-red">ชุดที่ ${idx+1} (${item.label||''}):</span><br>${item.details}</div>`;
+        if (tbody) {
+            tbody.innerHTML += `<tr><td class="py-2"><span class="font-bold">ชุดที่ ${idx+1}</span> <span class="text-xs text-slate-500 ml-2">(${item.w}x${item.h} ${item.unit})</span><div class="text-xs text-slate-400">${item.label || ''}</div></td><td class="py-2 text-center">${item.qty}</td><td class="py-2 text-right">${item.totalPerSet.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td><td class="py-2 text-right font-bold">${item.grandTotal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td></tr>`;
+        }
+        if (detailContent) {
+            detailContent.innerHTML += `<div class="border-b border-slate-200 pb-2 last:border-0"><span class="font-bold text-sunny-red">ชุดที่ ${idx+1} (${item.label||''}):</span><br>${item.details}</div>`;
+        }
     });
-    document.getElementById('qGrandTotal').innerText = sum.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' บาท';
+    
+    if (grandTotalEl) grandTotalEl.innerText = sum.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) + ' บาท';
 }
 
 function closeQuotation() { document.getElementById('quotationModal').classList.add('hidden'); }
@@ -271,6 +380,7 @@ function saveCurrentQuotation() {
         let typeLabel = 'ม่านม้วน';
         if(calcMode === 'EXT') typeLabel = 'ม่านม้วนภายนอก';
         else if(calcMode === 'PVC_CALC') typeLabel = 'ฉากกั้นห้อง PVC';
+        else if(calcMode === 'WOOD_CALC') typeLabel = 'มู่ลี่ไม้';
         else if(calcMode === 'ALU25') typeLabel = 'มู่ลี่อลูมิเนียม 25mm.';
 
         const qData = { 
@@ -403,6 +513,7 @@ function loadQuoteByIndex(index) {
     
     if(q.type.includes('ภายนอก')) calcMode = 'EXT';
     else if(q.type.includes('PVC') || q.type.includes('ฉาก')) calcMode = 'PVC_CALC';
+    else if(q.type.includes('ไม้') || q.type.includes('Wood')) calcMode = 'WOOD_CALC';
     else if(q.type.includes('25mm') || q.type.includes('อลู')) calcMode = 'ALU25';
     else calcMode = 'INT';
 
