@@ -1,3 +1,7 @@
+{
+type: existing file
+fileName: ui.js
+fullContent:
 // --- RICH TEXT & EMOJI UTILS ---
 const EMOJI_LIST = [
     '📢', '🔥', '✨', '🎉', '⚠️', '🚨', '✅', '❌', '🟢', '🔴', 
@@ -323,7 +327,8 @@ function openConfig() {
         st.innerText = isConnected ? "สถานะ: Online Mode" : "สถานะ: Offline Mode";
         st.className = isConnected ? "text-xs font-bold text-green-600" : "text-xs font-bold text-red-600";
     }
-    switchAdminTab('menu');
+    // Default Tab
+    switchAdminTab('dashboard');
 }
 
 function renderAdminCalcInputs() {
@@ -398,7 +403,7 @@ function saveConfig() {
 }
 
 function switchAdminTab(tab) {
-    ['menu','news','calc','saved', 'theme', 'features'].forEach(t => {
+    ['menu','news','calc','saved', 'theme', 'features', 'dashboard'].forEach(t => {
         const btn = document.getElementById('tab-btn-'+t);
         const content = document.getElementById('tab-content-'+t);
         if(btn) btn.className = "px-4 py-3 text-sm font-bold border-b-2 border-transparent text-slate-500 hover:bg-slate-50 whitespace-nowrap flex items-center gap-1";
@@ -408,10 +413,225 @@ function switchAdminTab(tab) {
     const activeContent = document.getElementById('tab-content-'+tab);
     if(activeBtn) activeBtn.className = "px-4 py-3 text-sm font-bold border-b-2 border-sunny-red text-sunny-red bg-red-50 whitespace-nowrap flex items-center gap-1";
     if(activeContent) activeContent.classList.remove('hidden');
+    
     if(tab === 'menu') renderAdminMenu();
     if(tab === 'news') renderAdminNews();
     if(tab === 'saved') renderQuotationsList('saved-quotations-list', 'all'); 
     if(tab === 'features') renderAdminFeatures();
+    if(tab === 'dashboard') renderAdminDashboard();
+}
+
+// --- DASHBOARD RENDERER (NEW) ---
+async function renderAdminDashboard() {
+    const container = document.getElementById('tab-content-dashboard');
+    if (!container) return;
+
+    // Loading State
+    container.innerHTML = `<div class="flex flex-col items-center justify-center h-64"><span class="loader w-10 h-10 border-4 border-slate-200 border-t-sunny-red rounded-full mb-4"></span><span class="text-slate-400">กำลังประมวลผลข้อมูล...</span></div>`;
+
+    try {
+        // Fetch real data if not present (using logic similar to renderQuotationsList)
+        let quotes = tempQuotes;
+        if (!quotes || quotes.length === 0) {
+            // Try fetching from DB first if online
+            if (db && auth && auth.currentUser) {
+                const snap = await db.collection("quotations").get();
+                quotes = [];
+                snap.forEach(doc => quotes.push({ ...doc.data(), docId: doc.id }));
+            } else {
+                // Offline/Guest
+                quotes = JSON.parse(localStorage.getItem('sunny_quotations')) || [];
+            }
+            tempQuotes = quotes;
+        }
+
+        // Calculate Stats
+        const totalDocs = quotes.length;
+        let totalValue = 0;
+        let woodCount = 0, pvcCount = 0, rollerCount = 0, aluCount = 0;
+        
+        // Data for Chart
+        const last7Days = {};
+        for(let i=6; i>=0; i--) {
+            const d = new Date(); d.setDate(d.getDate() - i);
+            const k = d.toLocaleDateString('th-TH');
+            last7Days[k] = 0;
+        }
+
+        quotes.forEach(q => {
+            // Parse Total (remove commas/text)
+            const amount = parseFloat((q.total || "0").toString().replace(/,/g, '').replace(/[^0-9.]/g, '')) || 0;
+            totalValue += amount;
+
+            // Categories
+            if (q.type.includes('ไม้')) woodCount++;
+            else if (q.type.includes('PVC') || q.type.includes('ฉาก')) pvcCount++;
+            else if (q.type.includes('ม่านม้วน')) rollerCount++;
+            else aluCount++;
+
+            // Chart Data
+            const qDate = new Date(q.date || q.id).toLocaleDateString('th-TH');
+            if (last7Days[qDate] !== undefined) last7Days[qDate] += amount;
+        });
+
+        // Prepare Recent Activity (Top 5)
+        const recent = [...quotes].sort((a,b) => (b.id||0) - (a.id||0)).slice(0, 5);
+
+        // --- RENDER HTML ---
+        container.innerHTML = `
+            <div class="max-w-5xl mx-auto space-y-6">
+                <div class="flex justify-between items-center mb-2">
+                    <div>
+                        <h3 class="text-2xl font-black text-slate-800">Overview</h3>
+                        <p class="text-xs text-slate-400">ภาพรวมระบบล่าสุด</p>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-xs font-bold text-slate-400">อัพเดทล่าสุด</div>
+                        <div class="text-sm font-bold text-slate-600">${new Date().toLocaleTimeString('th-TH')}</div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="rounded-2xl p-5 bg-gradient-to-br from-pink-500 to-rose-600 text-white shadow-lg relative overflow-hidden group">
+                        <div class="absolute top-0 right-0 p-4 opacity-20 transform group-hover:scale-125 transition-transform"><svg class="w-16 h-16" fill="currentColor" viewBox="0 0 20 20"><path d="M2 10a8 8 0 018-8v8h8a8 8 0 11-16 0z"/><path d="M12 2.252A8.014 8.014 0 0117.748 8H12V2.252z"/></svg></div>
+                        <div class="relative z-10">
+                            <div class="text-xs font-medium opacity-80 mb-1">ยอดเสนอราคา (ทั้งหมด)</div>
+                            <div class="text-2xl font-black tracking-tight">${totalValue.toLocaleString(undefined, {maximumFractionDigits:0})} ฿</div>
+                            <div class="mt-2 text-[10px] bg-white/20 inline-block px-2 py-0.5 rounded backdrop-blur-sm">System Total</div>
+                        </div>
+                    </div>
+                    
+                    <div class="rounded-2xl p-5 bg-gradient-to-br from-violet-500 to-purple-600 text-white shadow-lg relative overflow-hidden group">
+                        <div class="absolute top-0 right-0 p-4 opacity-20 transform group-hover:scale-125 transition-transform"><svg class="w-16 h-16" fill="currentColor" viewBox="0 0 20 20"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" /><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3z" clip-rule="evenodd" /></svg></div>
+                        <div class="relative z-10">
+                            <div class="text-xs font-medium opacity-80 mb-1">จำนวนใบเสนอราคา</div>
+                            <div class="text-2xl font-black tracking-tight">${totalDocs} ใบ</div>
+                            <div class="mt-2 text-[10px] bg-white/20 inline-block px-2 py-0.5 rounded backdrop-blur-sm">+${recent.length} Recent</div>
+                        </div>
+                    </div>
+
+                     <div class="rounded-2xl p-5 bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-lg relative overflow-hidden group">
+                        <div class="absolute top-0 right-0 p-4 opacity-20 transform group-hover:scale-125 transition-transform"><svg class="w-16 h-16" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd" /></svg></div>
+                        <div class="relative z-10">
+                            <div class="text-xs font-medium opacity-80 mb-1">รอการอนุมัติ (Pending)</div>
+                            <div class="text-2xl font-black tracking-tight">${Math.floor(totalDocs * 0.3)} รายการ</div>
+                            <div class="mt-2 text-[10px] bg-white/20 inline-block px-2 py-0.5 rounded backdrop-blur-sm">Simulated Data</div>
+                        </div>
+                    </div>
+
+                    <div class="rounded-2xl p-5 bg-gradient-to-br from-cyan-400 to-blue-500 text-white shadow-lg relative overflow-hidden group">
+                         <div class="absolute top-0 right-0 p-4 opacity-20 transform group-hover:scale-125 transition-transform"><svg class="w-16 h-16" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M12 7a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0V8.414l-4.293 4.293a1 1 0 01-1.414 0L8 10.414l-4.293 4.293a1 1 0 01-1.414-1.414l5-5a1 1 0 011.414 0L11 10.586 14.586 7H12z" clip-rule="evenodd" /></svg></div>
+                        <div class="relative z-10">
+                            <div class="text-xs font-medium opacity-80 mb-1">มูลค่าเฉลี่ย/ใบ</div>
+                            <div class="text-2xl font-black tracking-tight">${totalDocs > 0 ? (totalValue / totalDocs).toLocaleString(undefined, {maximumFractionDigits:0}) : 0} ฿</div>
+                            <div class="mt-2 text-[10px] bg-white/20 inline-block px-2 py-0.5 rounded backdrop-blur-sm">Avg. Ticket Size</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="lg:col-span-2 bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+                        <div class="flex justify-between items-center mb-6">
+                            <h4 class="font-bold text-slate-700">แนวโน้มยอดขาย (7 วันล่าสุด)</h4>
+                            <span class="text-xs text-slate-400 bg-slate-50 px-2 py-1 rounded">Weekly View</span>
+                        </div>
+                        <div class="h-48 flex items-end justify-between gap-2 px-2 relative">
+                            <div class="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-30">
+                                <div class="border-t border-slate-200 w-full h-px"></div>
+                                <div class="border-t border-slate-200 w-full h-px"></div>
+                                <div class="border-t border-slate-200 w-full h-px"></div>
+                            </div>
+                            ${Object.keys(last7Days).map((date, i) => {
+                                const val = last7Days[date];
+                                const max = Math.max(...Object.values(last7Days)) || 1;
+                                const height = (val / max) * 100;
+                                const hFinal = height < 10 ? 10 : height; // Min height
+                                return `
+                                    <div class="w-full bg-slate-50 rounded-t-lg relative group flex flex-col justify-end items-center hover:bg-slate-100 transition-colors cursor-pointer">
+                                        <div class="w-3/4 bg-gradient-to-t from-sunny-red to-pink-400 rounded-t-md opacity-80 group-hover:opacity-100 transition-all relative" style="height: ${hFinal}%">
+                                             <div class="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 shadow-lg">${val.toLocaleString()}</div>
+                                        </div>
+                                        <div class="mt-2 text-[9px] text-slate-400 font-bold rotate-0 truncate w-full text-center">${date.split('/')[0]}/${date.split('/')[1]}</div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex flex-col items-center justify-center">
+                        <h4 class="font-bold text-slate-700 w-full mb-4 text-left">สัดส่วนสินค้า</h4>
+                        <div class="relative w-40 h-40">
+                             <div class="w-full h-full rounded-full" style="background: conic-gradient(
+                                #E63946 0% ${ (woodCount/totalDocs)*100 }%, 
+                                #F59E0B ${ (woodCount/totalDocs)*100 }% ${ ((woodCount+pvcCount)/totalDocs)*100 }%, 
+                                #3B82F6 ${ ((woodCount+pvcCount)/totalDocs)*100 }% ${ ((woodCount+pvcCount+rollerCount)/totalDocs)*100 }%, 
+                                #8B5CF6 ${ ((woodCount+pvcCount+rollerCount)/totalDocs)*100 }% 100%
+                             )"></div>
+                             <div class="absolute inset-0 m-auto w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-inner">
+                                <div class="text-center">
+                                    <span class="block text-2xl font-black text-slate-700">${totalDocs}</span>
+                                    <span class="text-[9px] text-slate-400 uppercase">Items</span>
+                                </div>
+                             </div>
+                        </div>
+                        <div class="w-full mt-6 space-y-2">
+                             <div class="flex justify-between text-xs"><span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-sunny-red"></span> ไม้ (Wood)</span> <span class="font-bold">${woodCount}</span></div>
+                             <div class="flex justify-between text-xs"><span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-500"></span> PVC</span> <span class="font-bold">${pvcCount}</span></div>
+                             <div class="flex justify-between text-xs"><span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-blue-500"></span> ม่านม้วน</span> <span class="font-bold">${rollerCount}</span></div>
+                             <div class="flex justify-between text-xs"><span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-violet-500"></span> อลูมิเนียม</span> <span class="font-bold">${aluCount}</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                    <div class="p-6 border-b border-slate-100 flex justify-between items-center">
+                        <h4 class="font-bold text-slate-700">รายการล่าสุด (Recent Activity)</h4>
+                        <button onclick="switchAdminTab('saved')" class="text-xs text-sunny-red font-bold hover:underline">ดูทั้งหมด</button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left">
+                            <thead class="bg-slate-50 text-slate-500 font-bold border-b border-slate-100">
+                                <tr>
+                                    <th class="px-6 py-4">ID / วันที่</th>
+                                    <th class="px-6 py-4">ลูกค้า / เจ้าของ</th>
+                                    <th class="px-6 py-4">ประเภท</th>
+                                    <th class="px-6 py-4 text-right">ยอดรวม</th>
+                                    <th class="px-6 py-4 text-center">สถานะ</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 text-slate-600">
+                                ${recent.map(r => `
+                                    <tr class="hover:bg-slate-50 transition-colors">
+                                        <td class="px-6 py-4">
+                                            <div class="font-bold text-slate-700">#${(r.id || '').toString().slice(-4)}</div>
+                                            <div class="text-[10px] text-slate-400">${new Date(r.date).toLocaleDateString('th-TH')}</div>
+                                        </td>
+                                        <td class="px-6 py-4">
+                                            <div class="font-bold text-slate-700">${r.ownerName || 'Guest User'}</div>
+                                            <div class="text-[10px] text-slate-400">${r.ownerEmail || 'Local Device'}</div>
+                                        </td>
+                                        <td class="px-6 py-4"><span class="bg-slate-100 text-slate-600 px-2 py-1 rounded text-xs font-bold">${r.type}</span></td>
+                                        <td class="px-6 py-4 text-right font-bold text-slate-700">${r.total}</td>
+                                        <td class="px-6 py-4 text-center">
+                                            <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold ${r.uid ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-500'}">
+                                                <span class="w-1.5 h-1.5 rounded-full ${r.uid ? 'bg-green-500' : 'bg-gray-400'}"></span>
+                                                ${r.uid ? 'Online' : 'Local'}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                                ${recent.length === 0 ? '<tr><td colspan="5" class="px-6 py-8 text-center text-slate-400">ยังไม่มีข้อมูล</td></tr>' : ''}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        `;
+
+    } catch (e) {
+        console.error("Dashboard Error:", e);
+        container.innerHTML = `<div class="text-center text-red-400 py-10">เกิดข้อผิดพลาดในการโหลดข้อมูล: ${e.message}</div>`;
+    }
 }
 
 function renderAdminMenu() {
@@ -764,3 +984,4 @@ window.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => s.remove(), 700);
     }
 });
+}
