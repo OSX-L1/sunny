@@ -8,7 +8,7 @@ const ALU_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQz2OtjzRBm
 const ALU25_STD_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQz2OtjzRBmeUmLOTSgJ-Bt2woZPiR9QyzvIWcBXacheG3IplefFZE66yWYE43qVRQo2DAOPu9UClh5/pub?gid=684509454&single=true&output=csv";
 const ALU25_CHAIN_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQz2OtjzRBmeUmLOTSgJ-Bt2woZPiR9QyzvIWcBXacheG3IplefFZE66yWYE43qVRQo2DAOPu9UClh5/pub?gid=374964719&single=true&output=csv";
 
-// --- DEFAULT BACKGROUND IMAGES (ภาพสำรองสำหรับกันจอขาว) ---
+// --- DEFAULT BACKGROUND IMAGES (ส่วนสำคัญ: ภาพสำรองกันจอขาว) ---
 const DEFAULT_BGS = {
     WOOD: [
         'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=800&q=80',
@@ -281,7 +281,7 @@ function switchSystem(system) {
              if(slotImages[2].length === 0 && images[0]) slotImages[2].push(images[0]);
         }
     } 
-    // Priority 2: Fallback to DEFAULT_BGS
+    // Priority 2: Fallback to DEFAULT_BGS (Added back to fix white screen)
     else if (typeof DEFAULT_BGS !== 'undefined' && DEFAULT_BGS[system]) {
         hasImages = true;
         const defaults = DEFAULT_BGS[system];
@@ -293,6 +293,7 @@ function switchSystem(system) {
     if (hasImages) {
         header.classList.add('header-custom-bg');
         header.classList.remove('wooden-pattern');
+        // REMOVED: header.classList.add('wooden-pattern'); which causes white overlay look if BG is transparent
         headerContent.classList.add('header-content-glass');
         header.style.backgroundImage = '';
         
