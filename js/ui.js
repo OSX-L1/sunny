@@ -1,7 +1,3 @@
-{
-type: existing file
-fileName: ui.js
-fullContent:
 // --- RICH TEXT & EMOJI UTILS ---
 const EMOJI_LIST = [
     '📢', '🔥', '✨', '🎉', '⚠️', '🚨', '✅', '❌', '🟢', '🔴', 
@@ -984,4 +980,3 @@ window.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => s.remove(), 700);
     }
 });
-}
