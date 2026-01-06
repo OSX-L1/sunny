@@ -34,6 +34,7 @@
         .header-custom-bg { position: relative; min-height: 280px; }
         @media (min-width: 768px) { .header-custom-bg { min-height: 380px; } }
 
+        /* MOBILE HEADER ADJUSTMENTS */
         @media (max-width: 768px) { 
             .header-custom-bg { 
                 min-height: 200px; 
@@ -301,18 +302,5 @@
     <script src="js/stock.js"></script>
     <script src="js/calc.js"></script>
     <script src="js/ui.js"></script>
-    
-    <script>
-        // บังคับลบหน้าโลโก้ทิ้งเมื่อผ่านไป 4 วินาที (ป้องกันหน้าขาว)
-        setTimeout(function() {
-            var s = document.getElementById('intro-splash');
-            if(s) {
-                console.warn("Safety Valve: Forcing splash removal");
-                s.style.opacity = '0';
-                s.style.pointerEvents = 'none';
-                setTimeout(function(){ if(s) s.remove(); }, 1000);
-            }
-        }, 4000);
-    </script>
 </body>
 </html>
