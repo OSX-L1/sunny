@@ -194,28 +194,51 @@ function renderNews() {
         pinnedWrapper.appendChild(el);
     });
     
+    // --- SCROLLING NEWS LOGIC (UPDATED) ---
     if (scrollItems.length > 0) {
         scrollWrapper.classList.remove('hidden');
         scrollTrack.innerHTML = '';
-        const createItem = (item) => `
-            <div class="h-28 flex items-center gap-3 px-2 w-full shrink-0 hover:bg-slate-50/50 transition-colors">
-                <div class="flex-1 min-w-0 flex flex-col justify-center h-full">
-                    <div class="flex items-center gap-2 mb-0.5">
-                        ${isDateNew(item.date) ? `<span class="px-1.5 py-0.5 rounded-[4px] text-[9px] font-bold" style="background-color: ${item.badgeColor}; color: ${item.badgeTextColor}">${item.badgeLabel}</span>` : ''}
-                        <span class="text-[10px] text-slate-400">${formatDate(item.date)}</span>
+        
+        // Create HTML content once
+        let itemsHtml = '';
+        scrollItems.forEach(item => {
+            const isNew = isDateNew(item.date);
+            itemsHtml += `
+                <div class="h-28 flex items-center gap-3 px-4 w-full shrink-0 hover:bg-slate-50/50 transition-colors border-b border-slate-50 last:border-0">
+                    <div class="flex-1 min-w-0 flex flex-col justify-center h-full">
+                        <div class="flex items-center gap-2 mb-1">
+                            ${isNew ? `<span class="px-2 py-0.5 rounded-[4px] text-[9px] font-bold shadow-sm" style="background-color: ${item.badgeColor}; color: ${item.badgeTextColor}">${item.badgeLabel}</span>` : ''}
+                            <span class="text-[10px] text-slate-400 flex items-center gap-1">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                                ${formatDate(item.date)}
+                            </span>
+                        </div>
+                        <div class="text-sm font-medium whitespace-normal break-words leading-snug line-clamp-3" style="color: ${item.textColor}">${item.text}</div>
                     </div>
-                    <div class="text-sm font-medium whitespace-normal break-words leading-snug line-clamp-4" style="color: ${item.textColor}">${item.text}</div>
-                </div>
-            </div>`;
+                </div>`;
+        });
         
-        let html = '';
-        scrollItems.forEach(item => html += createItem(item));
-        if (scrollItems.length > 0) scrollItems.forEach(item => html += createItem(item));
+        // Double the content to create seamless loop
+        scrollTrack.innerHTML = itemsHtml + itemsHtml;
         
-        scrollTrack.innerHTML = html;
-        const speedVal = appConfig.newsSettings.speed || 3;
-        const totalDuration = (6 - speedVal) * scrollItems.length;
+        // FIX: Safe access to speed settings to prevent crash
+        const settings = appConfig.newsSettings || { speed: 3 };
+        const speedVal = parseInt(settings.speed) || 3;
+        
+        // Calculate total animation duration based on item count and speed
+        // Slower speed (1) = longer duration. Faster speed (5) = shorter duration.
+        const durationPerItem = 9 - speedVal; // e.g., Speed 3 -> 6s per item
+        const totalDuration = durationPerItem * scrollItems.length;
+        
+        // Reset and apply animation
+        scrollTrack.style.animation = 'none';
+        scrollTrack.offsetHeight; /* trigger reflow */
         scrollTrack.style.animation = `verticalSlide ${totalDuration}s linear infinite`;
+        
+        // Add hover pause functionality
+        scrollWrapper.onmouseenter = () => scrollTrack.style.animationPlayState = 'paused';
+        scrollWrapper.onmouseleave = () => scrollTrack.style.animationPlayState = 'running';
+
     } else {
         scrollWrapper.classList.add('hidden');
     }
@@ -302,8 +325,10 @@ function openConfig() {
     const titleInp = document.getElementById('conf-app-title');
     if(titleInp) titleInp.value = tempConfig.appTitle;
     
+    // Safe access for speed input
     const speedInp = document.getElementById('conf-news-speed');
-    if(speedInp) speedInp.value = tempConfig.newsSettings.speed || 3;
+    const safeSettings = tempConfig.newsSettings || { speed: 3 };
+    if(speedInp) speedInp.value = safeSettings.speed || 3;
     
     const logoutBtn = document.getElementById('logoutBtn');
     if(logoutBtn) logoutBtn.classList.remove('hidden');
@@ -386,7 +411,10 @@ function closeConfig() {
 
 function saveConfig() {
     tempConfig.appTitle = document.getElementById('conf-app-title').value;
-    tempConfig.newsSettings.speed = parseInt(document.getElementById('conf-news-speed').value);
+    
+    // Ensure newsSettings structure
+    if (!tempConfig.newsSettings) tempConfig.newsSettings = {};
+    tempConfig.newsSettings.speed = parseInt(document.getElementById('conf-news-speed').value) || 3;
     
     appConfig = tempConfig;
     applyTheme(appConfig.theme);
@@ -395,6 +423,7 @@ function saveConfig() {
         showToast("บันทึกสำเร็จ");
         closeConfig();
         renderSidebar();
+        renderNews(); // Refresh news immediately
     });
 }
 
