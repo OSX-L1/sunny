@@ -163,6 +163,17 @@ function renderNews() {
     const scrollWrapper = document.getElementById('scrolling-news-wrapper');
     const scrollTrack = document.getElementById('news-ticker-track');
     
+    // Inject Styles if needed to guarantee animation
+    if (!document.getElementById('ticker-style-injection')) {
+        const style = document.createElement('style');
+        style.id = 'ticker-style-injection';
+        style.innerHTML = `
+            @keyframes verticalSlide { 0% { transform: translateY(0); } 100% { transform: translateY(-50%); } }
+            .ticker-force-run { animation-play-state: running !important; }
+        `;
+        document.head.appendChild(style);
+    }
+    
     const news = appConfig.newsItems || [];
     if(news.length === 0) {
         if(container) container.classList.add('hidden');
@@ -194,17 +205,20 @@ function renderNews() {
         pinnedWrapper.appendChild(el);
     });
     
-    // --- SCROLLING NEWS LOGIC (UPDATED) ---
+    // --- SCROLLING NEWS LOGIC (REFINED) ---
     if (scrollItems.length > 0) {
         scrollWrapper.classList.remove('hidden');
         scrollTrack.innerHTML = '';
         
-        // Create HTML content once
+        // Remove padding from track to ensure smooth loop calculation
+        scrollTrack.classList.remove('p-2'); 
+        
         let itemsHtml = '';
         scrollItems.forEach(item => {
             const isNew = isDateNew(item.date);
+            // Added padding directly to item instead of track
             itemsHtml += `
-                <div class="h-28 flex items-center gap-3 px-4 w-full shrink-0 hover:bg-slate-50/50 transition-colors border-b border-slate-50 last:border-0">
+                <div class="h-28 flex items-center gap-3 px-4 w-full shrink-0 hover:bg-slate-50/50 transition-colors border-b border-slate-50 last:border-0 box-border">
                     <div class="flex-1 min-w-0 flex flex-col justify-center h-full">
                         <div class="flex items-center gap-2 mb-1">
                             ${isNew ? `<span class="px-2 py-0.5 rounded-[4px] text-[9px] font-bold shadow-sm" style="background-color: ${item.badgeColor}; color: ${item.badgeTextColor}">${item.badgeLabel}</span>` : ''}
@@ -218,24 +232,26 @@ function renderNews() {
                 </div>`;
         });
         
-        // Double the content to create seamless loop
+        // Double content for seamless loop
         scrollTrack.innerHTML = itemsHtml + itemsHtml;
         
-        // FIX: Safe access to speed settings to prevent crash
+        // Safe speed calculation
         const settings = appConfig.newsSettings || { speed: 3 };
-        const speedVal = parseInt(settings.speed) || 3;
+        let speedVal = parseInt(settings.speed);
+        if (isNaN(speedVal) || speedVal < 1) speedVal = 3;
+        if (speedVal > 10) speedVal = 10;
         
-        // Calculate total animation duration based on item count and speed
-        // Slower speed (1) = longer duration. Faster speed (5) = shorter duration.
-        const durationPerItem = 9 - speedVal; // e.g., Speed 3 -> 6s per item
-        const totalDuration = durationPerItem * scrollItems.length;
+        // Slower is nicer: 1=Slowest(10s), 5=Fastest(4s)
+        // Base duration per item (h-28 = 7rem)
+        const durationPerItem = 11 - (speedVal * 1.5); 
+        const totalDuration = Math.max(durationPerItem * scrollItems.length, 2);
         
-        // Reset and apply animation
+        // Reset Animation
         scrollTrack.style.animation = 'none';
-        scrollTrack.offsetHeight; /* trigger reflow */
+        scrollTrack.offsetHeight; /* Trigger Reflow */
         scrollTrack.style.animation = `verticalSlide ${totalDuration}s linear infinite`;
         
-        // Add hover pause functionality
+        // Interaction
         scrollWrapper.onmouseenter = () => scrollTrack.style.animationPlayState = 'paused';
         scrollWrapper.onmouseleave = () => scrollTrack.style.animationPlayState = 'running';
 
