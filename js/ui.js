@@ -6,30 +6,9 @@ const EMOJI_LIST = [
     '❤️', '👍', '⭐', '🌟', '🆕', '🆓', '🆔', '👉', '➡️', '🛑'
 ];
 
-// --- GLOBAL VARIABLES ---
+// --- GLOBAL USER PROFILE VAR ---
 let currentUserProfile = null;
-let deferredPrompt; 
-let tempQuotes = []; 
-let configListenerSet = false; 
 
-// กำหนดค่าเริ่มต้นทันที เพื่อกัน Crash
-let appConfig = {
-    appTitle: 'SUNNY Stock',
-    menus: [],
-    newsItems: [],
-    calcSettings: { enabled: true, wood: {}, pvc: {}, roller: {} },
-    theme: 'default'
-};
-let tempConfig = JSON.parse(JSON.stringify(appConfig));
-
-// --- FALLBACK ICONS ---
-const ICONS = (typeof window.ICONS !== 'undefined') ? window.ICONS : {
-    'wood': '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path></svg>',
-    'curtain': '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"></path></svg>',
-    'roller': '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>'
-};
-
-// --- UTILS ---
 function execCmd(command, value = null) {
     document.execCommand(command, false, value);
 }
@@ -44,17 +23,6 @@ function insertEmoji(idx, char, type = 'text') {
     const event = new Event('input', { bubbles: true });
     el.dispatchEvent(event);
     document.getElementById(pickerId).classList.add('hidden');
-}
-
-function showToast(msg) { 
-    const t = document.getElementById('toast'); 
-    const tm = document.getElementById('toast-message');
-    if(t && tm) {
-        tm.innerText = msg; 
-        t.classList.remove('opacity-0','pointer-events-none','toast-hide'); 
-        t.classList.add('toast-show'); 
-        setTimeout(()=>{t.classList.remove('toast-show');t.classList.add('toast-hide');},2500); 
-    }
 }
 
 // --- GOOGLE LOGIN FUNCTIONS ---
@@ -74,7 +42,7 @@ function logoutUser() {
     if (confirm("ต้องการออกจากระบบหรือไม่?")) {
         auth.signOut().then(() => {
             showToast("ออกจากระบบแล้ว");
-            currentUserProfile = null; 
+            currentUserProfile = null; // Clear profile on logout
         });
     }
 }
@@ -91,19 +59,13 @@ function shareCurrentPage() {
     });
 }
 
-// --- UI RENDERING (SIDEBAR & PROFILE & MOBILE MENU) ---
+// --- UI RENDERING ---
 function renderUserSidebar(user) {
-    // 1. Render for PC Sidebar
-    renderUserProfileToContainer(user, 'user-profile-section-pc');
-    // 2. Render for Mobile Bottom Sheet
-    renderUserProfileToContainer(user, 'user-profile-section-mobile');
-}
-
-function renderUserProfileToContainer(user, containerId) {
-    const container = document.getElementById(containerId);
+    const container = document.getElementById('user-profile-section');
     if (!container) return; 
 
     if (user && !user.isAnonymous) {
+        // ใช้ชื่อจาก Profile ที่ตั้งเอง หรือใช้ชื่อจาก Google
         const displayName = (currentUserProfile && currentUserProfile.displayName) ? currentUserProfile.displayName : user.displayName;
         const shopNameLabel = (currentUserProfile && currentUserProfile.shopName) ? `<div class="text-[10px] text-sunny-red font-bold truncate">${currentUserProfile.shopName}</div>` : '';
 
@@ -148,10 +110,8 @@ function openEditProfile() {
     const modal = document.getElementById('editProfileModal');
     if(!modal) return;
     modal.classList.remove('hidden');
-    // ปิดเมนู Bottom Sheet ถ้าเปิดอยู่
-    const sheet = document.getElementById('mainMenuSheet');
-    if(sheet) sheet.classList.add('hidden');
 
+    // Pre-fill Data
     const nameInput = document.getElementById('edit-profile-name');
     const shopNameInput = document.getElementById('edit-shop-name');
     const shopAddrInput = document.getElementById('edit-shop-address');
@@ -181,11 +141,13 @@ function closeEditProfile() {
 function handleLogoUpload(input) {
     if (input.files && input.files[0]) {
         const file = input.files[0];
+        // Check size (Limit 500KB to prevent Firestore bloat)
         if (file.size > 500 * 1024) {
             alert("ขนาดไฟล์รูปภาพต้องไม่เกิน 500KB");
             input.value = '';
             return;
         }
+        
         const reader = new FileReader();
         reader.onload = function(e) {
             const base64 = e.target.result;
@@ -215,6 +177,7 @@ function saveUserProfile() {
     db.collection('users').doc(uid).set(dataToSave, { merge: true }).then(() => {
         showToast("บันทึกข้อมูลเรียบร้อย");
         closeEditProfile();
+        // Update Local State
         currentUserProfile = dataToSave;
         renderUserSidebar(currentUser);
     }).catch(e => {
@@ -222,108 +185,70 @@ function saveUserProfile() {
     });
 }
 
-// --- RENDER MENU & SIDEBAR (UPDATED FOR PC & MOBILE) ---
 function renderSidebar() {
-    // 1. PC Sidebar Container
-    const pcContainer = document.getElementById('sidebar-menu-container-pc');
-    // 2. Mobile Menu Grid
-    const mobileMenuGrid = document.getElementById('mobile-menu-grid');
-    const mobileCalcGrid = document.getElementById('mobile-calc-grid');
+    const container = document.getElementById('sidebar-menu-container');
+    if (!container) return;
     
-    // Safety check for menus
-    const menus = (appConfig && appConfig.menus) ? appConfig.menus : [];
+    // PART 1: Stock Menu
+    let html = `<div class="px-6 mb-3 text-xs font-bold text-slate-400 uppercase tracking-wider">เช็คสต็อกสินค้า</div>`;
     
-    // --- Render for PC ---
-    if (pcContainer) {
-        let html = `<div class="px-6 mb-3 text-xs font-bold text-slate-400 uppercase tracking-wider">เช็คสต็อกสินค้า</div>`;
-        menus.forEach(menu => {
-            if (!menu.active) return;
-            const activeClass = currentSystem === menu.id 
-                ? 'bg-red-50 text-sunny-red border-sunny-red' 
-                : 'border-transparent text-slate-600 hover:bg-red-100 hover:text-red-700 hover:border-red-600';
-            const iconSvg = ICONS[menu.icon] || ICONS['wood'];
-            html += `
-                <a href="#" onclick="switchSystem('${menu.id}')" class="menu-item ${activeClass} group flex items-center px-6 py-3 transition-all duration-200 ease-out border-l-4">
-                    <div class="w-8 flex justify-center mr-2 transition-transform group-hover:scale-110 duration-200">${iconSvg}</div>
-                    <div class="flex flex-col"><span class="font-medium text-sm">${menu.name}</span>${menu.sub?`<span class="text-[10px] text-slate-400 group-hover:text-red-600 transition-colors">${menu.sub}</span>`:''}</div>
-                </a>`;
-        });
+    appConfig.menus.forEach(menu => {
+        if (!menu.active) return;
+        const activeClass = currentSystem === menu.id 
+            ? 'bg-red-50 text-sunny-red border-sunny-red' 
+            : 'border-transparent text-slate-600 hover:bg-red-100 hover:text-red-700 hover:border-red-600';
+        const iconSvg = ICONS[menu.icon] || ICONS['wood'];
+        html += `
+            <a href="#" onclick="switchSystem('${menu.id}')" class="menu-item ${activeClass} group flex items-center px-6 py-3 transition-all duration-200 ease-out border-l-4">
+                <div class="w-8 flex justify-center mr-2 transition-transform group-hover:scale-110 duration-200">${iconSvg}</div>
+                <div class="flex flex-col"><span class="font-medium text-sm">${menu.name}</span>${menu.sub?`<span class="text-[10px] text-slate-400 group-hover:text-red-600 transition-colors">${menu.sub}</span>`:''}</div>
+            </a>`;
+    });
+
+    // PART 2: Calculator Menu
+    const isAdmin = localStorage.getItem('isAdminLoggedIn') === 'true';
+    if (appConfig.calcSettings.enabled || isAdmin) {
+        html += `<div class="px-6 mt-6 mb-3 text-xs font-bold text-slate-400 uppercase tracking-wider flex justify-between"><span>ระบบคำนวณราคา</span>${!appConfig.calcSettings.enabled ? '<span class="text-[9px] bg-red-100 text-red-500 px-1 rounded">Admin Only</span>' : ''}</div>`;
         
-        // Add Calculator Menu for PC
-        const isAdmin = localStorage.getItem('isAdminLoggedIn') === 'true';
-        if ((appConfig && appConfig.calcSettings && appConfig.calcSettings.enabled) || isAdmin) {
-            html += `<div class="px-6 mt-6 mb-3 text-xs font-bold text-slate-400 uppercase tracking-wider flex justify-between"><span>ระบบคำนวณราคา</span>${(!appConfig || !appConfig.calcSettings || !appConfig.calcSettings.enabled) ? '<span class="text-[9px] bg-red-100 text-red-500 px-1 rounded">Admin Only</span>' : ''}</div>`;
-            const calcClass = "group flex items-center px-6 py-3 text-slate-600 hover:bg-indigo-50 hover:text-indigo-900 transition-all duration-200 ease-out border-l-4 border-transparent hover:border-indigo-900";
-            
-            const calcs = [
-                { id:'EXT', name:'ม่านม้วนภายนอก', icon:'roller' },
-                { id:'INT', name:'ม่านม้วนภายใน', icon:'roller' },
-                { id:'PVC_CALC', name:'ฉากกั้นห้อง PVC', icon:'curtain' },
-                { id:'WOOD_CALC', name:'มู่ลี่ไม้', icon:'wood' },
-                { id:'ALU25', name:'มู่ลี่อลูมิเนียม', icon:'wood' }
-            ];
-            
-            calcs.forEach(c => {
-                html += `<a href="#" onclick="switchCalcMode('${c.id}')" class="${calcClass}"><div class="w-8 flex justify-center mr-2 transition-transform group-hover:scale-110 duration-200">${ICONS[c.icon]}</div><span class="font-medium text-sm transition-transform group-hover:translate-x-1 duration-200">${c.name}</span></a>`;
-            });
-        }
-        pcContainer.innerHTML = html;
-    }
+        const calcClass = "group flex items-center px-6 py-3 text-slate-600 hover:bg-indigo-50 hover:text-indigo-900 transition-all duration-200 ease-out border-l-4 border-transparent hover:border-indigo-900";
+        
+        const iconRollerExt = `<svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>`;
+        const iconRollerInt = `<svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>`;
+        const iconPVC = `<svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" /></svg>`;
+        const iconWood = `<svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>`;
+        const iconAlu = `<svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.357a4 4 0 014.187 6.187H15" /></svg>`;
 
-    // --- Render for Mobile (Bottom Sheet) ---
-    if (mobileMenuGrid) {
-        let mobileHtml = '';
-        menus.forEach(menu => {
-            if (!menu.active) return;
-            const iconSvg = ICONS[menu.icon] || ICONS['wood'];
-            mobileHtml += `
-                <button onclick="switchSystem('${menu.id}'); toggleMainMenuSheet()" class="flex flex-col items-center gap-2 group">
-                    <div class="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-600 group-active:bg-sunny-red group-active:text-white transition-colors border border-slate-100 shadow-sm">
-                        <div class="w-7 h-7">${iconSvg}</div>
-                    </div>
-                    <span class="text-xs font-medium text-slate-600 text-center leading-tight truncate w-full">${menu.name}</span>
-                </button>
-            `;
-        });
-        mobileMenuGrid.innerHTML = mobileHtml;
+        html += `
+            <a href="#" onclick="switchCalcMode('EXT')" class="${calcClass}">
+                <div class="w-8 flex justify-center mr-2 transition-transform group-hover:scale-110 duration-200">${iconRollerExt}</div>
+                <span class="font-medium text-sm transition-transform group-hover:translate-x-1 duration-200">ม่านม้วนภายนอก</span>
+            </a>
+            <a href="#" onclick="switchCalcMode('INT')" class="${calcClass}">
+                <div class="w-8 flex justify-center mr-2 transition-transform group-hover:scale-110 duration-200">${iconRollerInt}</div>
+                <span class="font-medium text-sm transition-transform group-hover:translate-x-1 duration-200">ม่านม้วน (ภายใน)</span>
+            </a>
+            <a href="#" onclick="switchCalcMode('PVC_CALC')" class="${calcClass}">
+                <div class="w-8 flex justify-center mr-2 transition-transform group-hover:scale-110 duration-200">${iconPVC}</div>
+                <span class="font-medium text-sm transition-transform group-hover:translate-x-1 duration-200">ฉากกั้นห้อง PVC</span>
+            </a>
+            <a href="#" onclick="switchCalcMode('WOOD_CALC')" class="${calcClass}">
+                <div class="w-8 flex justify-center mr-2 transition-transform group-hover:scale-110 duration-200">${iconWood}</div>
+                <span class="font-medium text-sm transition-transform group-hover:translate-x-1 duration-200">มู่ลี่ไม้</span>
+            </a>
+            <a href="#" onclick="switchCalcMode('ALU25')" class="${calcClass}">
+                <div class="w-8 flex justify-center mr-2 transition-transform group-hover:scale-110 duration-200">${iconAlu}</div>
+                <span class="font-medium text-sm transition-transform group-hover:translate-x-1 duration-200">มู่ลี่อลูมิเนียม 25mm.</span>
+            </a>
+        `;
     }
-
-    if (mobileCalcGrid) {
-         const calcs = [
-            { id:'EXT', name:'ม่านม้วนภายนอก', icon:'🪟' },
-            { id:'INT', name:'ม่านม้วนภายใน', icon:'🏠' },
-            { id:'PVC_CALC', name:'ฉาก PVC', icon:'🚪' },
-            { id:'WOOD_CALC', name:'มู่ลี่ไม้', icon:'🪵' },
-            { id:'ALU25', name:'อลูมิเนียม', icon:'⚙️' }
-        ];
-        let calcHtml = '';
-        calcs.forEach(c => {
-            calcHtml += `
-                <button onclick="switchCalcMode('${c.id}'); toggleMainMenuSheet()" class="flex flex-col items-center gap-2 group">
-                    <div class="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 group-active:bg-indigo-600 group-active:text-white transition-colors border border-indigo-100 shadow-sm">
-                        <span class="text-2xl">${c.icon}</span>
-                    </div>
-                    <span class="text-xs font-medium text-slate-600 text-center leading-tight truncate w-full">${c.name}</span>
-                </button>
-            `;
-        });
-        mobileCalcGrid.innerHTML = calcHtml;
-    }
-
+    
+    container.innerHTML = html;
+    
     const titleEl = document.getElementById('app-title-display');
-    if(titleEl && appConfig) titleEl.innerText = appConfig.appTitle;
+    if(titleEl) titleEl.innerText = appConfig.appTitle;
     
     renderUserSidebar(currentUser);
     checkPwaStatus();
-}
-
-function toggleMainMenuSheet() {
-    const sheet = document.getElementById('mainMenuSheet');
-    if(sheet) sheet.classList.toggle('hidden');
-}
-
-function toggleHistorySheet() {
-    openHistoryModal();
 }
 
 function renderNews() {
@@ -332,14 +257,18 @@ function renderNews() {
     const scrollWrapper = document.getElementById('scrolling-news-wrapper');
     const scrollTrack = document.getElementById('news-ticker-track');
     
+    // Inject Styles if needed to guarantee animation
     if (!document.getElementById('ticker-style-injection')) {
         const style = document.createElement('style');
         style.id = 'ticker-style-injection';
-        style.innerHTML = `@keyframes verticalSlide { 0% { transform: translateY(0); } 100% { transform: translateY(-50%); } }`;
+        style.innerHTML = `
+            @keyframes verticalSlide { 0% { transform: translateY(0); } 100% { transform: translateY(-50%); } }
+            .ticker-force-run { animation-play-state: running !important; }
+        `;
         document.head.appendChild(style);
     }
     
-    const news = (appConfig && appConfig.newsItems) ? appConfig.newsItems : [];
+    const news = appConfig.newsItems || [];
     if(news.length === 0) {
         if(container) container.classList.add('hidden');
         return;
@@ -370,149 +299,474 @@ function renderNews() {
         pinnedWrapper.appendChild(el);
     });
     
+    // --- SCROLLING NEWS LOGIC (REFINED) ---
     if (scrollItems.length > 0) {
         scrollWrapper.classList.remove('hidden');
         scrollTrack.innerHTML = '';
+        
+        // Remove padding from track to ensure smooth loop calculation
         scrollTrack.classList.remove('p-2'); 
+        
         let itemsHtml = '';
         scrollItems.forEach(item => {
             const isNew = isDateNew(item.date);
+            // Added padding directly to item instead of track
             itemsHtml += `
                 <div class="h-28 flex items-center gap-3 px-4 w-full shrink-0 hover:bg-slate-50/50 transition-colors border-b border-slate-50 last:border-0 box-border">
                     <div class="flex-1 min-w-0 flex flex-col justify-center h-full">
                         <div class="flex items-center gap-2 mb-1">
                             ${isNew ? `<span class="px-2 py-0.5 rounded-[4px] text-[9px] font-bold shadow-sm" style="background-color: ${item.badgeColor}; color: ${item.badgeTextColor}">${item.badgeLabel}</span>` : ''}
-                            <span class="text-[10px] text-slate-400 flex items-center gap-1"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>${formatDate(item.date)}</span>
+                            <span class="text-[10px] text-slate-400 flex items-center gap-1">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                                ${formatDate(item.date)}
+                            </span>
                         </div>
                         <div class="text-sm font-medium whitespace-normal break-words leading-snug line-clamp-3" style="color: ${item.textColor}">${item.text}</div>
                     </div>
                 </div>`;
         });
+        
+        // Double content for seamless loop
         scrollTrack.innerHTML = itemsHtml + itemsHtml;
-        const settings = (appConfig && appConfig.newsSettings) ? appConfig.newsSettings : { speed: 3 };
+        
+        // Safe speed calculation
+        const settings = appConfig.newsSettings || { speed: 3 };
         let speedVal = parseInt(settings.speed);
         if (isNaN(speedVal) || speedVal < 1) speedVal = 3;
+        if (speedVal > 10) speedVal = 10;
+        
+        // Slower is nicer: 1=Slowest(10s), 5=Fastest(4s)
+        // Base duration per item (h-28 = 7rem)
         const durationPerItem = 11 - (speedVal * 1.5); 
         const totalDuration = Math.max(durationPerItem * scrollItems.length, 2);
+        
+        // Reset Animation
         scrollTrack.style.animation = 'none';
-        scrollTrack.offsetHeight; 
+        scrollTrack.offsetHeight; /* Trigger Reflow */
         scrollTrack.style.animation = `verticalSlide ${totalDuration}s linear infinite`;
+        
+        // Interaction
         scrollWrapper.onmouseenter = () => scrollTrack.style.animationPlayState = 'paused';
         scrollWrapper.onmouseleave = () => scrollTrack.style.animationPlayState = 'running';
+
     } else {
         scrollWrapper.classList.add('hidden');
     }
 }
 
+function requestNotificationPermission() {
+    if (!("Notification" in window)) return alert("อุปกรณ์ไม่รองรับ");
+    Notification.requestPermission().then(p => {
+        if (p === "granted") showToast("เปิดแจ้งเตือนแล้ว");
+        else alert("กรุณากดอนุญาตเพื่อรับแจ้งเตือน");
+        renderSidebar();
+    });
+}
+
+function checkAndNotifyNews(newsItems) {
+    if (!newsItems || newsItems.length === 0) return;
+    const latest = [...newsItems].sort((a,b) => b.id - a.id)[0];
+    const lastId = parseInt(localStorage.getItem('last_notified_news_id') || '0');
+    if (latest.id > lastId) {
+        if (Notification.permission === "granted") new Notification("ประกาศใหม่", { body: latest.text, icon: "https://via.placeholder.com/128" });
+        else showToast("ประกาศใหม่: " + latest.text);
+        localStorage.setItem('last_notified_news_id', latest.id);
+    }
+}
+
+function applyTheme(theme) {
+    document.body.classList.remove('theme-christmas');
+    let primary = '#E63946', dark = '#1D3557', showScene = 'none';
+    if (theme === 'christmas') {
+        document.body.classList.add('theme-christmas');
+        primary = '#D62828'; dark = '#14532D'; showScene = 'block';
+    }
+    const scene = document.getElementById('xmas-scene');
+    if(scene) scene.style.display = showScene;
+    document.querySelector('meta[name="theme-color"]').setAttribute("content", primary);
+    document.documentElement.style.setProperty('--sunny-red', primary);
+    document.documentElement.style.setProperty('--sunny-dark', dark);
+}
+
 // --- ADMIN FUNCTIONS ---
-function checkAdminLogin() { if (localStorage.getItem('isAdminLoggedIn') === 'true') { openConfig(); } else { openAdminLogin(); } }
-function openAdminLogin() { document.getElementById('adminLoginModal').classList.remove('hidden'); document.getElementById('adminPassword').value=''; document.getElementById('loginError').classList.add('hidden'); document.getElementById('adminPassword').focus(); }
-function closeAdminLogin() { document.getElementById('adminLoginModal').classList.add('hidden'); }
-function handleLogin() { if(document.getElementById('adminPassword').value === 'sn1988') { localStorage.setItem('isAdminLoggedIn', 'true'); closeAdminLogin(); showToast("เข้าสู่ระบบสำเร็จ"); openConfig(); renderSidebar(); } else { document.getElementById('loginError').classList.remove('hidden'); } }
-function logoutAdmin() { localStorage.removeItem('isAdminLoggedIn'); closeConfig(); showToast("ออกจากระบบแล้ว"); renderSidebar(); }
+function checkAdminLogin() { 
+    if (localStorage.getItem('isAdminLoggedIn') === 'true') {
+        openConfig(); 
+    } else {
+        openAdminLogin();
+    }
+}
 
-function openConfig() { 
-    tempConfig = JSON.parse(JSON.stringify(appConfig || {}));
-    if(!tempConfig.menus) tempConfig.menus = [];
-    if(!tempConfig.newsItems) tempConfig.newsItems = [];
-    if(!tempConfig.calcSettings) tempConfig.calcSettings = { enabled: true, wood: {}, pvc: {}, roller: {} };
-    if(!tempConfig.features) tempConfig.features = {};
-    if(!tempConfig.newsSettings) tempConfig.newsSettings = { speed: 3 };
+function openAdminLogin() { 
+    document.getElementById('adminLoginModal').classList.remove('hidden'); 
+    document.getElementById('adminPassword').value=''; 
+    document.getElementById('loginError').classList.add('hidden'); 
+    document.getElementById('adminPassword').focus(); 
+}
 
-    const modal = document.getElementById('adminConfigModal'); 
-    if(modal) modal.classList.remove('hidden'); 
-    
-    // Close mobile sheet if open
-    const sheet = document.getElementById('mainMenuSheet');
-    if(sheet) sheet.classList.add('hidden');
+function closeAdminLogin() { 
+    document.getElementById('adminLoginModal').classList.add('hidden'); 
+}
 
-    const titleInp = document.getElementById('conf-app-title'); 
-    if(titleInp) titleInp.value = tempConfig.appTitle || 'SUNNY Stock'; 
+function handleLogin() { 
+    if(document.getElementById('adminPassword').value === 'sn1988') { 
+        localStorage.setItem('isAdminLoggedIn', 'true'); 
+        closeAdminLogin(); 
+        showToast("เข้าสู่ระบบสำเร็จ"); 
+        openConfig(); 
+        renderSidebar(); 
+    } else { 
+        document.getElementById('loginError').classList.remove('hidden'); 
+    } 
+}
+
+function logoutAdmin() { 
+    localStorage.removeItem('isAdminLoggedIn'); 
+    closeConfig(); 
+    showToast("ออกจากระบบแล้ว"); 
+    renderSidebar(); 
+}
+
+function openConfig() {
+    tempConfig = JSON.parse(JSON.stringify(appConfig));
+    const modal = document.getElementById('adminConfigModal');
+    if(modal) modal.classList.remove('hidden');
     
-    const speedInp = document.getElementById('conf-news-speed'); 
-    if(speedInp) speedInp.value = tempConfig.newsSettings.speed || 3; 
+    const titleInp = document.getElementById('conf-app-title');
+    if(titleInp) titleInp.value = tempConfig.appTitle;
     
-    const logoutBtn = document.getElementById('logoutBtn'); 
-    if(logoutBtn) logoutBtn.classList.remove('hidden'); 
+    // Safe access for speed input
+    const speedInp = document.getElementById('conf-news-speed');
+    const safeSettings = tempConfig.newsSettings || { speed: 3 };
+    if(speedInp) speedInp.value = safeSettings.speed || 3;
     
-    const calcEn = document.getElementById('conf-calc-enabled'); 
-    if(calcEn) calcEn.checked = tempConfig.calcSettings.enabled; 
+    const logoutBtn = document.getElementById('logoutBtn');
+    if(logoutBtn) logoutBtn.classList.remove('hidden');
+    
+    const calcEn = document.getElementById('conf-calc-enabled');
+    if(calcEn) calcEn.checked = tempConfig.calcSettings.enabled;
     
     renderAdminCalcInputs(); 
+
+    const theme = tempConfig.theme || 'default';
+    const radios = document.getElementsByName('app-theme');
+    for(const r of radios) { r.checked = (r.value === theme); }
     
-    const theme = tempConfig.theme || 'default'; 
-    const radios = document.getElementsByName('app-theme'); 
-    for(const r of radios) { r.checked = (r.value === theme); } 
+    const st = document.getElementById('admin-mode-status');
+    if(st) {
+        const isConnected = auth && auth.currentUser;
+        st.innerText = isConnected ? "สถานะ: Online Mode" : "สถานะ: Offline Mode";
+        st.className = isConnected ? "text-xs font-bold text-green-600" : "text-xs font-bold text-red-600";
+    }
+    // Default Tab
+    switchAdminTab('dashboard');
+}
+
+function renderAdminCalcInputs() {
+    const container = document.getElementById('tab-content-calc');
+    if(!container) return;
     
-    const st = document.getElementById('admin-mode-status'); 
-    if(st) { 
-        const isConnected = auth && auth.currentUser; 
-        st.innerText = isConnected ? "สถานะ: Online Mode" : "สถานะ: Offline Mode"; 
-        st.className = isConnected ? "text-xs font-bold text-green-600" : "text-xs font-bold text-red-600"; 
-    } 
-    switchAdminTab('dashboard'); 
+    const w = tempConfig.calcSettings.wood;
+    const p = tempConfig.calcSettings.pvc;
+    const r = tempConfig.calcSettings.roller; 
+
+    container.innerHTML = `
+        <div class="bg-white p-4 rounded-xl border border-slate-200 flex items-center justify-between mb-4 sticky top-0 z-10 shadow-sm">
+            <span class="font-bold text-slate-700">เปิดใช้งานระบบคำนวณ</span>
+            <input type="checkbox" id="conf-calc-enabled" ${tempConfig.calcSettings.enabled ? 'checked' : ''} class="w-6 h-6 accent-sunny-red" onchange="tempConfig.calcSettings.enabled = this.checked">
+        </div>
+
+        <div class="space-y-6 pb-10">
+            <div class="bg-amber-50 p-4 rounded-xl border border-amber-200">
+                <h3 class="font-bold text-amber-800 border-b border-amber-200 pb-2 mb-3 flex items-center gap-2">🪵 มู่ลี่ไม้ (Wood)</h3>
+                <div class="grid grid-cols-2 gap-4">
+                    <div><label class="text-[10px] font-bold text-slate-500">ราคา Basswood (บาท)</label><input type="number" value="${w.priceBasswood}" onchange="tempConfig.calcSettings.wood.priceBasswood = parseFloat(this.value)" class="w-full p-2 border rounded text-sm bg-white"></div>
+                    <div><label class="text-[10px] font-bold text-slate-500">ราคา Foamwood (บาท)</label><input type="number" value="${w.priceFoamwood}" onchange="tempConfig.calcSettings.wood.priceFoamwood = parseFloat(this.value)" class="w-full p-2 border rounded text-sm bg-white"></div>
+                    <div><label class="text-[10px] font-bold text-slate-500">ตัวคูณ (เช่น 1.2)</label><input type="number" step="0.01" value="${w.factor}" onchange="tempConfig.calcSettings.wood.factor = parseFloat(this.value)" class="w-full p-2 border rounded text-sm bg-white"></div>
+                    <div><label class="text-[10px] font-bold text-slate-500">กว้างสูงสุด (Max W)</label><input type="number" step="0.01" value="${w.maxW}" onchange="tempConfig.calcSettings.wood.maxW = parseFloat(this.value)" class="w-full p-2 border rounded text-sm bg-white"></div>
+                    <div><label class="text-[10px] font-bold text-slate-500">กว้างขั้นต่ำ (Min W)</label><input type="number" step="0.01" value="${w.minW}" onchange="tempConfig.calcSettings.wood.minW = parseFloat(this.value)" class="w-full p-2 border rounded text-sm bg-white"></div>
+                    <div><label class="text-[10px] font-bold text-slate-500">สูงขั้นต่ำ (Min H)</label><input type="number" step="0.01" value="${w.minH}" onchange="tempConfig.calcSettings.wood.minH = parseFloat(this.value)" class="w-full p-2 border rounded text-sm bg-white"></div>
+                </div>
+            </div>
+
+            <div class="bg-blue-50 p-4 rounded-xl border border-blue-200">
+                <h3 class="font-bold text-blue-800 border-b border-blue-200 pb-2 mb-3 flex items-center gap-2">🚪 ฉากกั้นห้อง (PVC)</h3>
+                <div class="grid grid-cols-2 gap-4">
+                    <div><label class="text-[10px] font-bold text-slate-500">ตัวคูณ (เช่น 1.2)</label><input type="number" step="0.01" value="${p.factor}" onchange="tempConfig.calcSettings.pvc.factor = parseFloat(this.value)" class="w-full p-2 border rounded text-sm bg-white"></div>
+                    <div><label class="text-[10px] font-bold text-slate-500">กว้างขั้นต่ำ (Min W)</label><input type="number" step="0.01" value="${p.minW}" onchange="tempConfig.calcSettings.pvc.minW = parseFloat(this.value)" class="w-full p-2 border rounded text-sm bg-white"></div>
+                    <div><label class="text-[10px] font-bold text-slate-500">เริ่มปัดเศษความสูง (เมตร)</label><input type="number" step="0.01" value="${p.stepStartH}" onchange="tempConfig.calcSettings.pvc.stepStartH = parseFloat(this.value)" class="w-full p-2 border rounded text-sm bg-white"></div>
+                </div>
+            </div>
+
+            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <h3 class="font-bold text-slate-800 border-b border-slate-200 pb-2 mb-3 flex items-center gap-2">🪟 ม่านม้วน (Roller Blinds)</h3>
+                <div class="grid grid-cols-2 gap-4 mt-2">
+                    <div><label class="text-[10px] font-bold text-slate-500">ตัวคูณผ้า (Fabric Mult)</label><input type="number" step="0.1" value="${r.fabricMult}" onchange="tempConfig.calcSettings.roller.fabricMult = parseFloat(this.value)" class="w-full p-2 border rounded text-sm bg-slate-50"></div>
+                    <div><label class="text-[10px] font-bold text-slate-500">พื้นที่ขั้นต่ำ (Min Area)</label><input type="number" step="0.1" value="${r.minArea}" onchange="tempConfig.calcSettings.roller.minArea = parseFloat(this.value)" class="w-full p-2 border rounded text-sm bg-slate-50"></div>
+                    <div><label class="text-[10px] font-bold text-slate-500">ค่าอุปกรณ์ (Eq Ext)</label><input type="number" value="${r.eqExt}" onchange="tempConfig.calcSettings.roller.eqExt = parseFloat(this.value)" class="w-full p-2 border rounded text-sm bg-slate-50"></div>
+                    <div><label class="text-[10px] font-bold text-slate-500">สลิง (Sling)</label><input type="number" value="${r.sling}" onchange="tempConfig.calcSettings.roller.sling = parseFloat(this.value)" class="w-full p-2 border rounded text-sm bg-slate-50"></div>
+                    <div><label class="text-[10px] font-bold text-slate-500">รางบน (Rail Top)</label><input type="number" value="${r.railTop}" onchange="tempConfig.calcSettings.roller.railTop = parseFloat(this.value)" class="w-full p-2 border rounded text-sm bg-slate-50"></div>
+                    <div><label class="text-[10px] font-bold text-slate-500">รางล่าง (Rail Bot)</label><input type="number" value="${r.railBot}" onchange="tempConfig.calcSettings.roller.railBot = parseFloat(this.value)" class="w-full p-2 border rounded text-sm bg-slate-50"></div>
+                </div>
+            </div>
+             <div class="text-[10px] text-slate-400 text-center pt-2">* มู่ลี่อลูมิเนียม ใช้ตารางราคาแยก</div>
+        </div>
+    `;
 }
 
 function closeConfig() { 
-    if(appConfig && appConfig.theme) applyTheme(appConfig.theme); 
+    applyTheme(appConfig.theme); 
     document.getElementById('adminConfigModal').classList.add('hidden'); 
 }
 
-function saveConfig() { 
-    tempConfig.appTitle = document.getElementById('conf-app-title').value; 
-    if (!tempConfig.newsSettings) tempConfig.newsSettings = {}; 
-    tempConfig.newsSettings.speed = parseInt(document.getElementById('conf-news-speed').value) || 3; 
+function saveConfig() {
+    tempConfig.appTitle = document.getElementById('conf-app-title').value;
     
-    appConfig = tempConfig; 
-    applyTheme(appConfig.theme); 
-    db.collection("app_settings").doc("config").set(appConfig).then(()=>{ 
-        showToast("บันทึกสำเร็จ"); 
-        closeConfig(); 
-        renderSidebar(); 
-        renderNews(); 
-    }); 
+    // Ensure newsSettings structure
+    if (!tempConfig.newsSettings) tempConfig.newsSettings = {};
+    tempConfig.newsSettings.speed = parseInt(document.getElementById('conf-news-speed').value) || 3;
+    
+    appConfig = tempConfig;
+    applyTheme(appConfig.theme);
+    
+    db.collection("app_settings").doc("config").set(appConfig).then(()=>{
+        showToast("บันทึกสำเร็จ");
+        closeConfig();
+        renderSidebar();
+        renderNews(); // Refresh news immediately
+    });
 }
 
-function switchAdminTab(tab) { 
-    ['menu','news','calc','saved', 'theme', 'features', 'dashboard'].forEach(t => { 
-        const btn = document.getElementById('tab-btn-'+t); 
-        const content = document.getElementById('tab-content-'+t); 
-        if(btn) btn.className = "px-4 py-3 text-sm font-bold border-b-2 border-transparent text-slate-500 hover:bg-slate-50 whitespace-nowrap flex items-center gap-1"; 
-        if(content) content.classList.add('hidden'); 
-    }); 
-    const activeBtn = document.getElementById('tab-btn-'+tab); 
-    const activeContent = document.getElementById('tab-content-'+tab); 
-    if(activeBtn) activeBtn.className = "px-4 py-3 text-sm font-bold border-b-2 border-sunny-red text-sunny-red bg-red-50 whitespace-nowrap flex items-center gap-1"; 
-    if(activeContent) activeContent.classList.remove('hidden'); 
+function switchAdminTab(tab) {
+    ['menu','news','calc','saved', 'theme', 'features', 'dashboard'].forEach(t => {
+        const btn = document.getElementById('tab-btn-'+t);
+        const content = document.getElementById('tab-content-'+t);
+        if(btn) btn.className = "px-4 py-3 text-sm font-bold border-b-2 border-transparent text-slate-500 hover:bg-slate-50 whitespace-nowrap flex items-center gap-1";
+        if(content) content.classList.add('hidden');
+    });
+    const activeBtn = document.getElementById('tab-btn-'+tab);
+    const activeContent = document.getElementById('tab-content-'+tab);
+    if(activeBtn) activeBtn.className = "px-4 py-3 text-sm font-bold border-b-2 border-sunny-red text-sunny-red bg-red-50 whitespace-nowrap flex items-center gap-1";
+    if(activeContent) activeContent.classList.remove('hidden');
     
-    if(tab === 'menu') renderAdminMenu(); 
-    if(tab === 'news') renderAdminNews(); 
+    if(tab === 'menu') renderAdminMenu();
+    if(tab === 'news') renderAdminNews();
     if(tab === 'saved') renderQuotationsList('saved-quotations-list', 'all'); 
-    if(tab === 'features') renderAdminFeatures(); 
-    if(tab === 'dashboard') renderAdminDashboard(); 
+    if(tab === 'features') renderAdminFeatures();
+    if(tab === 'dashboard') renderAdminDashboard();
 }
 
-function toggleSidebar() { const sb = document.getElementById('sidebar'); const ov = document.getElementById('sidebarOverlay'); sb.classList.toggle('-translate-x-full'); ov.classList.toggle('hidden'); }
-function requestNotificationPermission() { if (!("Notification" in window)) return alert("อุปกรณ์ไม่รองรับ"); Notification.requestPermission().then(p => { if (p === "granted") showToast("เปิดแจ้งเตือนแล้ว"); else alert("กรุณากดอนุญาตเพื่อรับแจ้งเตือน"); renderSidebar(); }); }
-function checkAndNotifyNews(newsItems) { if (!newsItems || newsItems.length === 0) return; const latest = [...newsItems].sort((a,b) => b.id - a.id)[0]; const lastId = parseInt(localStorage.getItem('last_notified_news_id') || '0'); if (latest.id > lastId) { if (Notification.permission === "granted") new Notification("ประกาศใหม่", { body: latest.text, icon: "https://via.placeholder.com/128" }); else showToast("ประกาศใหม่: " + latest.text); localStorage.setItem('last_notified_news_id', latest.id); } }
-function applyTheme(theme) { document.body.classList.remove('theme-christmas'); let primary = '#E63946', dark = '#1D3557', showScene = 'none'; if (theme === 'christmas') { document.body.classList.add('theme-christmas'); primary = '#D62828'; dark = '#14532D'; showScene = 'block'; } const scene = document.getElementById('xmas-scene'); if(scene) scene.style.display = showScene; document.querySelector('meta[name="theme-color"]').setAttribute("content", primary); document.documentElement.style.setProperty('--sunny-red', primary); document.documentElement.style.setProperty('--sunny-dark', dark); }
+// --- DASHBOARD RENDERER (NEW) ---
+async function renderAdminDashboard() {
+    const container = document.getElementById('tab-content-dashboard');
+    if (!container) return;
 
-// --- ADMIN RENDERERS ---
-function renderAdminCalcInputs() { 
-    const container = document.getElementById('tab-content-calc'); 
-    if(!container) return; 
-    const w = tempConfig.calcSettings.wood; 
-    const p = tempConfig.calcSettings.pvc; 
-    const r = tempConfig.calcSettings.roller; 
-    container.innerHTML = `
-        <div class="bg-white p-4 rounded-xl border border-slate-200 flex items-center justify-between mb-4 sticky top-0 z-10 shadow-sm"><span class="font-bold text-slate-700">เปิดใช้งานระบบคำนวณ</span><input type="checkbox" id="conf-calc-enabled" ${tempConfig.calcSettings.enabled ? 'checked' : ''} class="w-6 h-6 accent-sunny-red" onchange="tempConfig.calcSettings.enabled = this.checked"></div>
-        <div class="space-y-6 pb-10">
-            <div class="bg-amber-50 p-4 rounded-xl border border-amber-200"><h3 class="font-bold text-amber-800 border-b border-amber-200 pb-2 mb-3 flex items-center gap-2">🪵 มู่ลี่ไม้ (Wood)</h3><div class="grid grid-cols-2 gap-4"><div><label class="text-[10px] font-bold text-slate-500">ราคา Basswood (บาท)</label><input type="number" value="${w.priceBasswood}" onchange="tempConfig.calcSettings.wood.priceBasswood = parseFloat(this.value)" class="w-full p-2 border rounded text-sm bg-white"></div><div><label class="text-[10px] font-bold text-slate-500">ราคา Foamwood (บาท)</label><input type="number" value="${w.priceFoamwood}" onchange="tempConfig.calcSettings.wood.priceFoamwood = parseFloat(this.value)" class="w-full p-2 border rounded text-sm bg-white"></div><div><label class="text-[10px] font-bold text-slate-500">ตัวคูณ (เช่น 1.2)</label><input type="number" step="0.01" value="${w.factor}" onchange="tempConfig.calcSettings.wood.factor = parseFloat(this.value)" class="w-full p-2 border rounded text-sm bg-white"></div><div><label class="text-[10px] font-bold text-slate-500">กว้างสูงสุด (Max W)</label><input type="number" step="0.01" value="${w.maxW}" onchange="tempConfig.calcSettings.wood.maxW = parseFloat(this.value)" class="w-full p-2 border rounded text-sm bg-white"></div><div><label class="text-[10px] font-bold text-slate-500">กว้างขั้นต่ำ (Min W)</label><input type="number" step="0.01" value="${w.minW}" onchange="tempConfig.calcSettings.wood.minW = parseFloat(this.value)" class="w-full p-2 border rounded text-sm bg-white"></div><div><label class="text-[10px] font-bold text-slate-500">สูงขั้นต่ำ (Min H)</label><input type="number" step="0.01" value="${w.minH}" onchange="tempConfig.calcSettings.wood.minH = parseFloat(this.value)" class="w-full p-2 border rounded text-sm bg-white"></div></div></div>
-            <div class="bg-blue-50 p-4 rounded-xl border border-blue-200"><h3 class="font-bold text-blue-800 border-b border-blue-200 pb-2 mb-3 flex items-center gap-2">🚪 ฉากกั้นห้อง (PVC)</h3><div class="grid grid-cols-2 gap-4"><div><label class="text-[10px] font-bold text-slate-500">ตัวคูณ (เช่น 1.2)</label><input type="number" step="0.01" value="${p.factor}" onchange="tempConfig.calcSettings.pvc.factor = parseFloat(this.value)" class="w-full p-2 border rounded text-sm bg-white"></div><div><label class="text-[10px] font-bold text-slate-500">กว้างขั้นต่ำ (Min W)</label><input type="number" step="0.01" value="${p.minW}" onchange="tempConfig.calcSettings.pvc.minW = parseFloat(this.value)" class="w-full p-2 border rounded text-sm bg-white"></div><div><label class="text-[10px] font-bold text-slate-500">เริ่มปัดเศษความสูง (เมตร)</label><input type="number" step="0.01" value="${p.stepStartH}" onchange="tempConfig.calcSettings.pvc.stepStartH = parseFloat(this.value)" class="w-full p-2 border rounded text-sm bg-white"></div></div></div>
-            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200"><h3 class="font-bold text-slate-800 border-b border-slate-200 pb-2 mb-3 flex items-center gap-2">🪟 ม่านม้วน (Roller Blinds)</h3><div class="grid grid-cols-2 gap-4 mt-2"><div><label class="text-[10px] font-bold text-slate-500">ตัวคูณผ้า (Fabric Mult)</label><input type="number" step="0.1" value="${r.fabricMult}" onchange="tempConfig.calcSettings.roller.fabricMult = parseFloat(this.value)" class="w-full p-2 border rounded text-sm bg-slate-50"></div><div><label class="text-[10px] font-bold text-slate-500">พื้นที่ขั้นต่ำ (Min Area)</label><input type="number" step="0.1" value="${r.minArea}" onchange="tempConfig.calcSettings.roller.minArea = parseFloat(this.value)" class="w-full p-2 border rounded text-sm bg-slate-50"></div><div><label class="text-[10px] font-bold text-slate-500">ค่าอุปกรณ์ (Eq Ext)</label><input type="number" value="${r.eqExt}" onchange="tempConfig.calcSettings.roller.eqExt = parseFloat(this.value)" class="w-full p-2 border rounded text-sm bg-slate-50"></div><div><label class="text-[10px] font-bold text-slate-500">สลิง (Sling)</label><input type="number" value="${r.sling}" onchange="tempConfig.calcSettings.roller.sling = parseFloat(this.value)" class="w-full p-2 border rounded text-sm bg-slate-50"></div><div><label class="text-[10px] font-bold text-slate-500">รางบน (Rail Top)</label><input type="number" value="${r.railTop}" onchange="tempConfig.calcSettings.roller.railTop = parseFloat(this.value)" class="w-full p-2 border rounded text-sm bg-slate-50"></div><div><label class="text-[10px] font-bold text-slate-500">รางล่าง (Rail Bot)</label><input type="number" value="${r.railBot}" onchange="tempConfig.calcSettings.roller.railBot = parseFloat(this.value)" class="w-full p-2 border rounded text-sm bg-slate-50"></div></div></div>
-            <div class="text-[10px] text-slate-400 text-center pt-2">* มู่ลี่อลูมิเนียม ใช้ตารางราคาแยก</div>
-        </div>
-    `; 
+    // Loading State
+    container.innerHTML = `<div class="flex flex-col items-center justify-center h-64"><span class="loader w-10 h-10 border-4 border-slate-200 border-t-sunny-red rounded-full mb-4"></span><span class="text-slate-400">กำลังประมวลผลข้อมูล...</span></div>`;
+
+    try {
+        // Fetch real data if not present (using logic similar to renderQuotationsList)
+        let quotes = tempQuotes;
+        if (!quotes || quotes.length === 0) {
+            // Try fetching from DB first if online
+            if (db && auth && auth.currentUser) {
+                const snap = await db.collection("quotations").get();
+                quotes = [];
+                snap.forEach(doc => quotes.push({ ...doc.data(), docId: doc.id }));
+            } else {
+                // Offline/Guest
+                quotes = JSON.parse(localStorage.getItem('sunny_quotations')) || [];
+            }
+            tempQuotes = quotes;
+        }
+
+        // Calculate Stats
+        const totalDocs = quotes.length;
+        let totalValue = 0;
+        let woodCount = 0, pvcCount = 0, rollerCount = 0, aluCount = 0;
+        
+        // Data for Chart
+        const last7Days = {};
+        for(let i=6; i>=0; i--) {
+            const d = new Date(); d.setDate(d.getDate() - i);
+            const k = d.toLocaleDateString('th-TH');
+            last7Days[k] = 0;
+        }
+
+        quotes.forEach(q => {
+            // Parse Total (remove commas/text)
+            const amount = parseFloat((q.total || "0").toString().replace(/,/g, '').replace(/[^0-9.]/g, '')) || 0;
+            totalValue += amount;
+
+            // Categories
+            if (q.type.includes('ไม้')) woodCount++;
+            else if (q.type.includes('PVC') || q.type.includes('ฉาก')) pvcCount++;
+            else if (q.type.includes('ม่านม้วน')) rollerCount++;
+            else aluCount++;
+
+            // Chart Data
+            const qDate = new Date(q.date || q.id).toLocaleDateString('th-TH');
+            if (last7Days[qDate] !== undefined) last7Days[qDate] += amount;
+        });
+
+        // Prepare Recent Activity (Top 5)
+        const recent = [...quotes].sort((a,b) => (b.id||0) - (a.id||0)).slice(0, 5);
+
+        // --- RENDER HTML ---
+        container.innerHTML = `
+            <div class="max-w-5xl mx-auto space-y-6">
+                <div class="flex justify-between items-center mb-2">
+                    <div>
+                        <h3 class="text-2xl font-black text-slate-800">Overview</h3>
+                        <p class="text-xs text-slate-400">ภาพรวมระบบล่าสุด</p>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-xs font-bold text-slate-400">อัพเดทล่าสุด</div>
+                        <div class="text-sm font-bold text-slate-600">${new Date().toLocaleTimeString('th-TH')}</div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="rounded-2xl p-5 bg-gradient-to-br from-pink-500 to-rose-600 text-white shadow-lg relative overflow-hidden group">
+                        <div class="absolute top-0 right-0 p-4 opacity-20 transform group-hover:scale-125 transition-transform"><svg class="w-16 h-16" fill="currentColor" viewBox="0 0 20 20"><path d="M2 10a8 8 0 018-8v8h8a8 8 0 11-16 0z"/><path d="M12 2.252A8.014 8.014 0 0117.748 8H12V2.252z"/></svg></div>
+                        <div class="relative z-10">
+                            <div class="text-xs font-medium opacity-80 mb-1">ยอดเสนอราคา (ทั้งหมด)</div>
+                            <div class="text-2xl font-black tracking-tight">${totalValue.toLocaleString(undefined, {maximumFractionDigits:0})} ฿</div>
+                            <div class="mt-2 text-[10px] bg-white/20 inline-block px-2 py-0.5 rounded backdrop-blur-sm">System Total</div>
+                        </div>
+                    </div>
+                    
+                    <div class="rounded-2xl p-5 bg-gradient-to-br from-violet-500 to-purple-600 text-white shadow-lg relative overflow-hidden group">
+                        <div class="absolute top-0 right-0 p-4 opacity-20 transform group-hover:scale-125 transition-transform"><svg class="w-16 h-16" fill="currentColor" viewBox="0 0 20 20"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" /><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3z" clip-rule="evenodd" /></svg></div>
+                        <div class="relative z-10">
+                            <div class="text-xs font-medium opacity-80 mb-1">จำนวนใบเสนอราคา</div>
+                            <div class="text-2xl font-black tracking-tight">${totalDocs} ใบ</div>
+                            <div class="mt-2 text-[10px] bg-white/20 inline-block px-2 py-0.5 rounded backdrop-blur-sm">+${recent.length} Recent</div>
+                        </div>
+                    </div>
+
+                     <div class="rounded-2xl p-5 bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-lg relative overflow-hidden group">
+                        <div class="absolute top-0 right-0 p-4 opacity-20 transform group-hover:scale-125 transition-transform"><svg class="w-16 h-16" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd" /></svg></div>
+                        <div class="relative z-10">
+                            <div class="text-xs font-medium opacity-80 mb-1">รอการอนุมัติ (Pending)</div>
+                            <div class="text-2xl font-black tracking-tight">${Math.floor(totalDocs * 0.3)} รายการ</div>
+                            <div class="mt-2 text-[10px] bg-white/20 inline-block px-2 py-0.5 rounded backdrop-blur-sm">Simulated Data</div>
+                        </div>
+                    </div>
+
+                    <div class="rounded-2xl p-5 bg-gradient-to-br from-cyan-400 to-blue-500 text-white shadow-lg relative overflow-hidden group">
+                         <div class="absolute top-0 right-0 p-4 opacity-20 transform group-hover:scale-125 transition-transform"><svg class="w-16 h-16" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M12 7a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0V8.414l-4.293 4.293a1 1 0 01-1.414 0L8 10.414l-4.293 4.293a1 1 0 01-1.414-1.414l5-5a1 1 0 011.414 0L11 10.586 14.586 7H12z" clip-rule="evenodd" /></svg></div>
+                        <div class="relative z-10">
+                            <div class="text-xs font-medium opacity-80 mb-1">มูลค่าเฉลี่ย/ใบ</div>
+                            <div class="text-2xl font-black tracking-tight">${totalDocs > 0 ? (totalValue / totalDocs).toLocaleString(undefined, {maximumFractionDigits:0}) : 0} ฿</div>
+                            <div class="mt-2 text-[10px] bg-white/20 inline-block px-2 py-0.5 rounded backdrop-blur-sm">Avg. Ticket Size</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="lg:col-span-2 bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+                        <div class="flex justify-between items-center mb-6">
+                            <h4 class="font-bold text-slate-700">แนวโน้มยอดขาย (7 วันล่าสุด)</h4>
+                            <span class="text-xs text-slate-400 bg-slate-50 px-2 py-1 rounded">Weekly View</span>
+                        </div>
+                        <div class="h-48 flex items-end justify-between gap-2 px-2 relative">
+                            <div class="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-30">
+                                <div class="border-t border-slate-200 w-full h-px"></div>
+                                <div class="border-t border-slate-200 w-full h-px"></div>
+                                <div class="border-t border-slate-200 w-full h-px"></div>
+                            </div>
+                            ${Object.keys(last7Days).map((date, i) => {
+                                const val = last7Days[date];
+                                const max = Math.max(...Object.values(last7Days)) || 1;
+                                const height = (val / max) * 100;
+                                const hFinal = height < 10 ? 10 : height; // Min height
+                                return `
+                                    <div class="w-full bg-slate-50 rounded-t-lg relative group flex flex-col justify-end items-center hover:bg-slate-100 transition-colors cursor-pointer">
+                                        <div class="w-3/4 bg-gradient-to-t from-sunny-red to-pink-400 rounded-t-md opacity-80 group-hover:opacity-100 transition-all relative" style="height: ${hFinal}%">
+                                             <div class="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 shadow-lg">${val.toLocaleString()}</div>
+                                        </div>
+                                        <div class="mt-2 text-[9px] text-slate-400 font-bold rotate-0 truncate w-full text-center">${date.split('/')[0]}/${date.split('/')[1]}</div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex flex-col items-center justify-center">
+                        <h4 class="font-bold text-slate-700 w-full mb-4 text-left">สัดส่วนสินค้า</h4>
+                        <div class="relative w-40 h-40">
+                             <div class="w-full h-full rounded-full" style="background: conic-gradient(
+                                #E63946 0% ${ (woodCount/totalDocs)*100 }%, 
+                                #F59E0B ${ (woodCount/totalDocs)*100 }% ${ ((woodCount+pvcCount)/totalDocs)*100 }%, 
+                                #3B82F6 ${ ((woodCount+pvcCount)/totalDocs)*100 }% ${ ((woodCount+pvcCount+rollerCount)/totalDocs)*100 }%, 
+                                #8B5CF6 ${ ((woodCount+pvcCount+rollerCount)/totalDocs)*100 }% 100%
+                             )"></div>
+                             <div class="absolute inset-0 m-auto w-24 h-24 bg-white rounded-full flex items-center justify-center shadow-inner">
+                                <div class="text-center">
+                                    <span class="block text-2xl font-black text-slate-700">${totalDocs}</span>
+                                    <span class="text-[9px] text-slate-400 uppercase">Items</span>
+                                </div>
+                             </div>
+                        </div>
+                        <div class="w-full mt-6 space-y-2">
+                             <div class="flex justify-between text-xs"><span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-sunny-red"></span> ไม้ (Wood)</span> <span class="font-bold">${woodCount}</span></div>
+                             <div class="flex justify-between text-xs"><span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-500"></span> PVC</span> <span class="font-bold">${pvcCount}</span></div>
+                             <div class="flex justify-between text-xs"><span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-blue-500"></span> ม่านม้วน</span> <span class="font-bold">${rollerCount}</span></div>
+                             <div class="flex justify-between text-xs"><span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-violet-500"></span> อลูมิเนียม</span> <span class="font-bold">${aluCount}</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                    <div class="p-6 border-b border-slate-100 flex justify-between items-center">
+                        <h4 class="font-bold text-slate-700">รายการล่าสุด (Recent Activity)</h4>
+                        <button onclick="switchAdminTab('saved')" class="text-xs text-sunny-red font-bold hover:underline">ดูทั้งหมด</button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left">
+                            <thead class="bg-slate-50 text-slate-500 font-bold border-b border-slate-100">
+                                <tr>
+                                    <th class="px-6 py-4">ID / วันที่</th>
+                                    <th class="px-6 py-4">ลูกค้า / เจ้าของ</th>
+                                    <th class="px-6 py-4">ประเภท</th>
+                                    <th class="px-6 py-4 text-right">ยอดรวม</th>
+                                    <th class="px-6 py-4 text-center">สถานะ</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 text-slate-600">
+                                ${recent.map(r => `
+                                    <tr class="hover:bg-slate-50 transition-colors">
+                                        <td class="px-6 py-4">
+                                            <div class="font-bold text-slate-700">#${(r.id || '').toString().slice(-4)}</div>
+                                            <div class="text-[10px] text-slate-400">${new Date(r.date).toLocaleDateString('th-TH')}</div>
+                                        </td>
+                                        <td class="px-6 py-4">
+                                            <div class="font-bold text-slate-700">${r.ownerName || 'Guest User'}</div>
+                                            <div class="text-[10px] text-slate-400">${r.ownerEmail || 'Local Device'}</div>
+                                        </td>
+                                        <td class="px-6 py-4"><span class="bg-slate-100 text-slate-600 px-2 py-1 rounded text-xs font-bold">${r.type}</span></td>
+                                        <td class="px-6 py-4 text-right font-bold text-slate-700">${r.total}</td>
+                                        <td class="px-6 py-4 text-center">
+                                            <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold ${r.uid ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-500'}">
+                                                <span class="w-1.5 h-1.5 rounded-full ${r.uid ? 'bg-green-500' : 'bg-gray-400'}"></span>
+                                                ${r.uid ? 'Online' : 'Local'}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                                ${recent.length === 0 ? '<tr><td colspan="5" class="px-6 py-8 text-center text-slate-400">ยังไม่มีข้อมูล</td></tr>' : ''}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        `;
+
+    } catch (e) {
+        console.error("Dashboard Error:", e);
+        container.innerHTML = `<div class="text-center text-red-400 py-10">เกิดข้อผิดพลาดในการโหลดข้อมูล: ${e.message}</div>`;
+    }
 }
 
 function renderAdminMenu() {
@@ -520,11 +774,6 @@ function renderAdminMenu() {
     if (!list) return;
     list.innerHTML = '';
     
-    // Safety check for menus
-    if(!tempConfig.menus || !Array.isArray(tempConfig.menus)) {
-        tempConfig.menus = [];
-    }
-
     tempConfig.menus.forEach((menu, idx) => {
         const slots = [
             { key: 'bgImage1', label: 'ช่องซ้าย (Left)' },
@@ -622,12 +871,6 @@ window.removeMenuImage = (menuIdx, slotKey, imgIdx) => {
 function renderAdminNews() {
     const list = document.getElementById('admin-news-list'); 
     list.innerHTML = '';
-    
-    // Safety check for newsItems
-    if(!tempConfig.newsItems || !Array.isArray(tempConfig.newsItems)) {
-        tempConfig.newsItems = [];
-    }
-
     const sorted = [...tempConfig.newsItems].sort((a,b) => (b.pinned===a.pinned)? 0 : b.pinned? 1 : -1);
     
     sorted.forEach((item, idx) => {
@@ -737,192 +980,110 @@ function deleteNews(idx) {
     }
 }
 
-// --- DASHBOARD RENDERER ---
-async function renderAdminDashboard() {
-    const container = document.getElementById('tab-content-dashboard');
-    if (!container) return;
+function renderAdminFeatures() {
+    const list = document.getElementById('admin-features-list');
+    list.innerHTML = '';
+    Object.keys(tempConfig.features).forEach(key => {
+        list.innerHTML += `<div class="flex justify-between items-center p-3 bg-white border rounded-xl"><span class="font-mono text-sm">${key}</span><input type="checkbox" ${tempConfig.features[key]?'checked':''} onchange="tempConfig.features['${key}']=this.checked" class="w-5 h-5 accent-purple-600"></div>`;
+    });
+}
 
-    container.innerHTML = `<div class="flex flex-col items-center justify-center h-64"><span class="loader w-10 h-10 border-4 border-slate-200 border-t-sunny-red rounded-full mb-4"></span><span class="text-slate-400">กำลังประมวลผลข้อมูล...</span></div>`;
-
-    try {
-        let quotes = tempQuotes;
-        if (!quotes || quotes.length === 0) {
-            if (db && auth && auth.currentUser) {
-                const snap = await db.collection("quotations").get();
-                quotes = [];
-                snap.forEach(doc => quotes.push({ ...doc.data(), docId: doc.id }));
-            } else {
-                quotes = JSON.parse(localStorage.getItem('sunny_quotations')) || [];
-            }
-            tempQuotes = quotes;
-        }
-
-        const totalDocs = quotes.length;
-        let totalValue = 0;
-        let woodCount = 0, pvcCount = 0, rollerCount = 0, aluCount = 0;
-        
-        const last7Days = {};
-        for(let i=6; i>=0; i--) {
-            const d = new Date(); d.setDate(d.getDate() - i);
-            const k = d.toLocaleDateString('th-TH');
-            last7Days[k] = 0;
-        }
-
-        quotes.forEach(q => {
-            const amount = parseFloat((q.total || "0").toString().replace(/,/g, '').replace(/[^0-9.]/g, '')) || 0;
-            totalValue += amount;
-
-            if (q.type.includes('ไม้')) woodCount++;
-            else if (q.type.includes('PVC') || q.type.includes('ฉาก')) pvcCount++;
-            else if (q.type.includes('ม่านม้วน')) rollerCount++;
-            else aluCount++;
-
-            const qDate = new Date(q.date || q.id).toLocaleDateString('th-TH');
-            if (last7Days[qDate] !== undefined) last7Days[qDate] += amount;
-        });
-
-        const recent = [...quotes].sort((a,b) => (b.id||0) - (a.id||0)).slice(0, 5);
-
-        container.innerHTML = `
-            <div class="max-w-5xl mx-auto space-y-6">
-                <div class="flex justify-between items-center mb-2">
-                    <div><h3 class="text-2xl font-black text-slate-800">Overview</h3><p class="text-xs text-slate-400">ภาพรวมระบบล่าสุด</p></div>
-                    <div class="text-right"><div class="text-xs font-bold text-slate-400">อัพเดทล่าสุด</div><div class="text-sm font-bold text-slate-600">${new Date().toLocaleTimeString('th-TH')}</div></div>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div class="rounded-2xl p-5 bg-gradient-to-br from-pink-500 to-rose-600 text-white shadow-lg relative overflow-hidden group">
-                        <div class="relative z-10">
-                            <div class="text-xs font-medium opacity-80 mb-1">ยอดเสนอราคา (ทั้งหมด)</div>
-                            <div class="text-2xl font-black tracking-tight">${totalValue.toLocaleString(undefined, {maximumFractionDigits:0})} ฿</div>
-                            <div class="mt-2 text-[10px] bg-white/20 inline-block px-2 py-0.5 rounded backdrop-blur-sm">System Total</div>
-                        </div>
-                    </div>
-                    <div class="rounded-2xl p-5 bg-gradient-to-br from-violet-500 to-purple-600 text-white shadow-lg relative overflow-hidden group">
-                        <div class="relative z-10">
-                            <div class="text-xs font-medium opacity-80 mb-1">จำนวนใบเสนอราคา</div>
-                            <div class="text-2xl font-black tracking-tight">${totalDocs} ใบ</div>
-                            <div class="mt-2 text-[10px] bg-white/20 inline-block px-2 py-0.5 rounded backdrop-blur-sm">+${recent.length} Recent</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-                    <div class="p-6 border-b border-slate-100 flex justify-between items-center"><h4 class="font-bold text-slate-700">รายการล่าสุด (Recent Activity)</h4><button onclick="switchAdminTab('saved')" class="text-xs text-sunny-red font-bold hover:underline">ดูทั้งหมด</button></div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-sm text-left">
-                            <thead class="bg-slate-50 text-slate-500 font-bold border-b border-slate-100">
-                                <tr><th class="px-6 py-4">ID / วันที่</th><th class="px-6 py-4">ลูกค้า / เจ้าของ</th><th class="px-6 py-4">ประเภท</th><th class="px-6 py-4 text-right">ยอดรวม</th><th class="px-6 py-4 text-center">สถานะ</th></tr>
-                            </thead>
-                            <tbody class="divide-y divide-slate-100 text-slate-600">
-                                ${recent.map(r => `
-                                    <tr class="hover:bg-slate-50 transition-colors">
-                                        <td class="px-6 py-4"><div class="font-bold text-slate-700">#${(r.id || '').toString().slice(-4)}</div><div class="text-[10px] text-slate-400">${new Date(r.date).toLocaleDateString('th-TH')}</div></td>
-                                        <td class="px-6 py-4"><div class="font-bold text-slate-700">${r.ownerName || 'Guest User'}</div><div class="text-[10px] text-slate-400">${r.ownerEmail || 'Local Device'}</div></td>
-                                        <td class="px-6 py-4"><span class="bg-slate-100 text-slate-600 px-2 py-1 rounded text-xs font-bold">${r.type}</span></td>
-                                        <td class="px-6 py-4 text-right font-bold text-slate-700">${r.total}</td>
-                                        <td class="px-6 py-4 text-center"><span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold ${r.uid ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-500'}"><span class="w-1.5 h-1.5 rounded-full ${r.uid ? 'bg-green-500' : 'bg-gray-400'}"></span>${r.uid ? 'Online' : 'Local'}</span></td>
-                                    </tr>
-                                `).join('')}
-                                ${recent.length === 0 ? '<tr><td colspan="5" class="px-6 py-8 text-center text-slate-400">ยังไม่มีข้อมูล</td></tr>' : ''}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        `;
-    } catch (e) {
-        console.error("Dashboard Error:", e);
-        container.innerHTML = `<div class="text-center text-red-400 py-10">เกิดข้อผิดพลาดในการโหลดข้อมูล: ${e.message}</div>`;
+function addNewFeature() {
+    const key = document.getElementById('new-feature-key').value.trim();
+    if(key) {
+        tempConfig.features[key] = false;
+        renderAdminFeatures();
+        document.getElementById('new-feature-key').value='';
     }
 }
 
-// --- PWA INSTALLATION & IOS SUPPORT ---
+function previewTheme(themeName) { applyTheme(themeName); tempConfig.theme = themeName; }
+
+// --- UTILS ---
+function toggleSidebar() { const sb = document.getElementById('sidebar'); const ov = document.getElementById('sidebarOverlay'); sb.classList.toggle('-translate-x-full'); ov.classList.toggle('hidden'); }
+function toggleHelpModal(show) { document.getElementById('helpModal').classList.toggle('hidden', !show); }
+function toggleCodeListModal(show) { document.getElementById('codeListModal').classList.toggle('hidden', !show); }
+
+function showToast(msg) { 
+    const t = document.getElementById('toast'); 
+    const tm = document.getElementById('toast-message');
+    if(t && tm) {
+        tm.innerText = msg; 
+        t.classList.remove('opacity-0','pointer-events-none','toast-hide'); 
+        t.classList.add('toast-show'); 
+        setTimeout(()=>{t.classList.remove('toast-show');t.classList.add('toast-hide');},2500); 
+    }
+}
+
+// --- PWA INSTALLATION ---
 let deferredPrompt;
-
-function isIOS() {
-    return [
-        'iPad Simulator',
-        'iPhone Simulator',
-        'iPod Simulator',
-        'iPad',
-        'iPhone',
-        'iPod'
-    ].includes(navigator.platform) || (navigator.userAgent.includes("Mac") && "ontouchend" in document);
-}
-
-function checkPwaStatus() { 
-    const sidebarBtn = document.getElementById('pwaInstallBtn'); 
-    const headerBtn = document.getElementById('headerInstallBtn'); 
-    const isDeviceIOS = isIOS();
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
-
-    if(isStandalone) { 
-        if(sidebarBtn) sidebarBtn.classList.add('hidden'); 
-        if(headerBtn) headerBtn.classList.add('hidden'); 
-        return; 
-    } 
-    
-    // Always show install button if not installed
-    if(headerBtn) headerBtn.classList.remove('hidden'); 
-    if(sidebarBtn) sidebarBtn.classList.remove('hidden');
-
-    if (isDeviceIOS) {
-        const showIOSGuide = () => {
-            const modal = document.getElementById('installGuideModal');
-            const title = document.getElementById('installGuideTitle');
-            const instructions = document.getElementById('installInstructions');
-            if (modal && title && instructions) {
-                title.innerText = "ติดตั้งบน iOS (iPhone/iPad)";
-                instructions.innerHTML = `<div class="flex flex-col gap-4 items-center text-center"><p class="text-sunny-red font-bold">iOS ไม่รองรับการติดตั้งอัตโนมัติ</p><p>กรุณาทำตามขั้นตอน:</p><div class="flex items-center gap-3 text-left bg-slate-50 p-3 rounded-xl w-full border border-slate-100"><span class="text-2xl">1️⃣</span><span class="text-sm">แตะปุ่ม <strong>แชร์ (Share)</strong> <br><span class="text-xs text-slate-400">ไอคอนสี่เหลี่ยมมีลูกศรชี้ขึ้น</span></span></div><div class="flex items-center gap-3 text-left bg-slate-50 p-3 rounded-xl w-full border border-slate-100"><span class="text-2xl">2️⃣</span><span class="text-sm">เลือก <strong>"เพิ่มไปยังหน้าจอโฮม"</strong> <br><span class="text-xs text-slate-400">(Add to Home Screen)</span></span></div><div class="text-xs text-slate-400 mt-2">กด "เพิ่ม" ที่มุมขวาบน</div></div>`;
-                modal.classList.remove('hidden');
-            }
-        };
-        if(headerBtn) headerBtn.onclick = showIOSGuide;
-        if(sidebarBtn) sidebarBtn.onclick = showIOSGuide;
-    } else {
-        const handleInstall = () => {
-            if (deferredPrompt) {
-                deferredPrompt.prompt();
-                deferredPrompt.userChoice.then((choiceResult) => {
-                    if (choiceResult.outcome === 'accepted') checkPwaStatus();
-                    deferredPrompt = null;
-                });
-            } else {
-                document.getElementById('installGuideModal').classList.remove('hidden');
-                const title = document.getElementById('installGuideTitle');
-                if(title) title.innerText = "ติดตั้งแอพ";
-                const instructions = document.getElementById('installInstructions');
-                if(instructions) instructions.innerHTML = "หากไม่ขึ้นปุ่มติดตั้งอัตโนมัติ<br>ให้กดเมนูเบราว์เซอร์ แล้วเลือก <strong>'Install App'</strong> หรือ <strong>'Add to Home Screen'</strong>";
-            }
-        };
-        if(headerBtn) headerBtn.onclick = handleInstall;
-        if(sidebarBtn) sidebarBtn.onclick = handleInstall;
-    }
-}
-
 window.addEventListener('beforeinstallprompt', (e) => { 
     e.preventDefault(); 
     deferredPrompt = e; 
     checkPwaStatus(); 
 });
 
+function isStandalone() { return (window.matchMedia('(display-mode: standalone)').matches) || (window.navigator.standalone) || document.referrer.includes('android-app://'); }
+
+function checkPwaStatus() { 
+    const sidebarBtn = document.getElementById('pwaInstallBtn'); 
+    const headerBtn = document.getElementById('headerInstallBtn'); 
+    
+    if(isStandalone()) { 
+        if(sidebarBtn) sidebarBtn.classList.add('hidden'); 
+        if(headerBtn) headerBtn.classList.add('hidden'); 
+        return; 
+    } 
+    
+    if(headerBtn) headerBtn.classList.remove('hidden'); 
+    if (sidebarBtn) { 
+        sidebarBtn.classList.remove('hidden'); 
+        sidebarBtn.onclick = installApp; 
+    } 
+}
+
+async function installApp() { 
+    if (deferredPrompt) { 
+        deferredPrompt.prompt(); 
+        const { outcome } = await deferredPrompt.userChoice; 
+        deferredPrompt = null; 
+        if(outcome === 'accepted') { 
+            checkPwaStatus(); 
+        } 
+        return; 
+    } 
+    document.getElementById('installGuideModal').classList.remove('hidden'); 
+}
+
 window.addEventListener('appinstalled', () => { 
     console.log('App installed'); 
     checkPwaStatus(); 
 });
 
-// --- GENERATE MANIFEST & ICONS ---
+// --- GENERATE DYNAMIC MANIFEST ---
 const iconSvgUrl = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' fill='%23E63946' rx='80'/%3E%3Ctext x='50%25' y='55%25' dominant-baseline='middle' text-anchor='middle' fill='white' font-family='Arial, sans-serif' font-weight='900' font-style='normal' font-size='380'%3ES%3C/text%3E%3C/svg%3E";
-const manifestData = { name: "SUNNY Stock", short_name: "SUNNY", start_url: ".", display: "standalone", background_color: "#FFFFFF", theme_color: "#E63946", icons: [{ src: iconSvgUrl, sizes: "192x192 512x512", type: "image/svg+xml", purpose: "any maskable" }] };
+const manifestData = {
+    name: "SUNNY Stock",
+    short_name: "SUNNY",
+    start_url: ".",
+    display: "standalone",
+    background_color: "#FFFFFF",
+    theme_color: "#E63946",
+    icons: [
+        {
+            src: iconSvgUrl,
+            sizes: "192x192 512x512",
+            type: "image/svg+xml",
+            purpose: "any maskable"
+        }
+    ]
+};
 const stringManifest = JSON.stringify(manifestData);
 const blob = new Blob([stringManifest], {type: 'application/json'});
 const manifestURL = URL.createObjectURL(blob);
 document.querySelector('#manifest-placeholder').setAttribute('href', manifestURL);
-const appleIcon = document.getElementById('apple-touch-icon');
-if(appleIcon) appleIcon.setAttribute('href', iconSvgUrl);
 
-// --- APP INIT (FIXED: SPLASH SCREEN & CONFIG) ---
+// --- APP INIT ---
 function initFirebase() {
     try {
         if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
@@ -932,40 +1093,40 @@ function initFirebase() {
         auth.onAuthStateChanged((user) => {
             if (user) {
                 currentUser = user;
+                console.log("Auth Status:", user.isAnonymous ? "Guest Mode" : "Member Mode (" + user.email + ")");
+                
+                // --- NEW: Fetch User Profile ---
                 if (!user.isAnonymous) {
                     db.collection('users').doc(user.uid).onSnapshot(doc => {
                         currentUserProfile = doc.exists ? doc.data() : null;
                         if(typeof renderUserSidebar === 'function') renderUserSidebar(user);
                     });
                 }
+                // -------------------------------
+                
                 if(typeof renderUserSidebar === 'function') renderUserSidebar(user);
                 
-                if (typeof configListenerSet === 'undefined' || !configListenerSet) {
+                if (!configListenerSet) {
                     db.collection("app_settings").doc("config").onSnapshot((doc) => {
                         if (doc.exists) {
                             const newData = doc.data();
                             if(typeof checkAndNotifyNews === 'function') checkAndNotifyNews(newData.newsItems || []);
                             appConfig = newData;
                             
-                            // Merge Defaults
+                            // Deep Merge Defaults incase new fields added
                             if(!appConfig.calcSettings) appConfig.calcSettings = DEFAULT_CONFIG.calcSettings;
+                            if(!appConfig.calcSettings.wood) appConfig.calcSettings.wood = DEFAULT_CONFIG.calcSettings.wood;
+                            if(!appConfig.calcSettings.pvc) appConfig.calcSettings.pvc = DEFAULT_CONFIG.calcSettings.pvc;
+                            if(!appConfig.calcSettings.roller) appConfig.calcSettings.roller = DEFAULT_CONFIG.calcSettings.roller;
+
                             if(!appConfig.newsItems) appConfig.newsItems = [];
                             if(!appConfig.theme) appConfig.theme = 'default';
-                            if(!appConfig.menus) appConfig.menus = DEFAULT_CONFIG.menus;
-
+                            
                             localStorage.setItem('sunny_app_config', JSON.stringify(appConfig));
                             
-                            // Re-render UI
                             if(typeof renderSidebar === 'function') renderSidebar(); 
                             if(typeof renderNews === 'function') renderNews(); 
                             if(typeof applyTheme === 'function') applyTheme(appConfig.theme);
-                            
-                            // Re-render Admin Tabs if open
-                            if(!document.getElementById('adminConfigModal').classList.contains('hidden')) {
-                                if(typeof renderAdminMenu === 'function') renderAdminMenu();
-                                if(typeof renderAdminNews === 'function') renderAdminNews();
-                            }
-                            
                             if(currentSystem && typeof switchSystem === 'function') switchSystem(currentSystem);
                         } else { 
                             db.collection("app_settings").doc("config").set(appConfig); 
@@ -973,7 +1134,9 @@ function initFirebase() {
                     }, error => console.error("Config Listener Error:", error));
                     configListenerSet = true;
                 }
+
             } else {
+                console.log("No user, signing in anonymously...");
                 auth.signInAnonymously().catch(e => console.error("Anon Auth Error:", e));
             }
         });
@@ -981,23 +1144,37 @@ function initFirebase() {
 }
 
 window.addEventListener('DOMContentLoaded', () => { 
-    // FAILSAFE: Force remove splash screen after 2.5s no matter what
-    setTimeout(() => {
-        const s = document.getElementById('intro-splash');
-        if(s) {
-            s.classList.add('opacity-0', 'pointer-events-none');
-            setTimeout(() => s.remove(), 700);
-        }
-    }, 2500); 
-
+    // 1. Init Firebase (Config)
     initFirebase();
-    renderSidebar();
-    setupAutocomplete();
-    checkPwaStatus(); 
-    if(typeof renderNews === 'function') renderNews();
     
+    // 2. Render Initial UI (UI)
+    renderSidebar();
+    
+    // 3. Setup Logic (Stock)
+    setupAutocomplete();
+    checkPwaStatus();
+    
+    // 4. Always Render News First (Fixes "News Missing")
+    if(typeof renderNews === 'function') renderNews();
+
+    // 5. Check URL & Decide Page Load
     const params = new URLSearchParams(window.location.search);
     const sharedMode = params.get('mode');
-    if (sharedMode) { checkUrlParams(); } 
-    else { setTimeout(() => { if(typeof switchSystem === 'function') switchSystem('WOOD'); }, 500); }
+
+    if (sharedMode) {
+        // CASE: DEEP LINK (Run Deep Link Logic Only)
+        checkUrlParams(); 
+    } else {
+        // CASE: NORMAL (Run Default Logic)
+        setTimeout(() => {
+            if(typeof switchSystem === 'function') switchSystem('WOOD');
+        }, 500);
+    }
+
+    // Remove Splash
+    const s = document.getElementById('intro-splash');
+    if(s) {
+        s.classList.add('opacity-0', 'pointer-events-none');
+        setTimeout(() => s.remove(), 700);
+    }
 });
