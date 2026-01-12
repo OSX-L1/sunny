@@ -10,7 +10,6 @@ const EMOJI_LIST = [
 let currentUserProfile = null;
 let deferredPrompt; 
 let tempQuotes = []; 
-let tempConfig = {}; // For Admin Editing
 let configListenerSet = false; 
 
 // กำหนดค่าเริ่มต้นทันที เพื่อกัน Crash
@@ -21,6 +20,7 @@ let appConfig = {
     calcSettings: { enabled: true, wood: {}, pvc: {}, roller: {} },
     theme: 'default'
 };
+let tempConfig = JSON.parse(JSON.stringify(appConfig));
 
 // --- FALLBACK ICONS ---
 const ICONS = (typeof window.ICONS !== 'undefined') ? window.ICONS : {
@@ -91,16 +91,23 @@ function shareCurrentPage() {
     });
 }
 
-// --- NEW FUNCTION: RENDER PROFILE DUAL (PC & MOBILE) ---
-function renderUserProfileDual(user, pcContainer, mobileContainer) {
-    if (!user) return;
-    const isMember = !user.isAnonymous;
-    const displayName = (currentUserProfile && currentUserProfile.displayName) ? currentUserProfile.displayName : user.displayName;
-    const shopNameLabel = (currentUserProfile && currentUserProfile.shopName) ? `<div class="text-[10px] text-sunny-red font-bold truncate">${currentUserProfile.shopName}</div>` : '';
+// --- UI RENDERING (SIDEBAR & PROFILE & MOBILE MENU) ---
+function renderUserSidebar(user) {
+    // 1. Render for PC Sidebar
+    renderUserProfileToContainer(user, 'user-profile-section-pc');
+    // 2. Render for Mobile Bottom Sheet
+    renderUserProfileToContainer(user, 'user-profile-section-mobile');
+}
 
-    let html = '';
-    if (isMember) {
-        html = `
+function renderUserProfileToContainer(user, containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return; 
+
+    if (user && !user.isAnonymous) {
+        const displayName = (currentUserProfile && currentUserProfile.displayName) ? currentUserProfile.displayName : user.displayName;
+        const shopNameLabel = (currentUserProfile && currentUserProfile.shopName) ? `<div class="text-[10px] text-sunny-red font-bold truncate">${currentUserProfile.shopName}</div>` : '';
+
+        container.innerHTML = `
             <div class="flex items-center gap-3 p-3 bg-red-50 rounded-xl border border-red-100 mb-2">
                 <img src="${user.photoURL || 'https://via.placeholder.com/40'}" class="w-10 h-10 rounded-full border-2 border-white shadow-sm">
                 <div class="flex-1 min-w-0">
@@ -112,24 +119,28 @@ function renderUserProfileDual(user, pcContainer, mobileContainer) {
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
                 </button>
             </div>
-            <button onclick="openEditProfile()" class="w-full mb-2 flex items-center justify-center gap-2 bg-white text-slate-600 border border-slate-200 py-2 rounded-xl text-xs font-bold hover:bg-slate-50 hover:text-sunny-red hover:border-red-100 transition-all shadow-sm">✏️ แก้ไขข้อมูลร้านค้า</button>
+            
+            <button onclick="openEditProfile()" class="w-full mb-2 flex items-center justify-center gap-2 bg-white text-slate-600 border border-slate-200 py-2 rounded-xl text-xs font-bold hover:bg-slate-50 hover:text-sunny-red hover:border-red-100 transition-all shadow-sm">
+                ✏️ แก้ไขข้อมูลร้านค้า
+            </button>
+
             <button onclick="openHistoryModal()" class="w-full mb-4 flex items-center justify-center gap-2 bg-white text-slate-600 border border-slate-200 py-2.5 rounded-xl text-xs font-bold hover:bg-slate-50 hover:text-sunny-red hover:border-red-100 transition-all shadow-sm btn-bounce">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg> ดูประวัติที่บันทึกไว้
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" /></svg>
+                ดูประวัติที่บันทึกไว้
             </button>
         `;
     } else {
-        html = `
+        container.innerHTML = `
             <button onclick="loginWithGoogle()" class="w-full flex items-center justify-center gap-2 bg-white text-slate-600 border border-slate-200 py-3 rounded-xl text-sm font-bold hover:bg-slate-50 hover:text-sunny-red hover:border-red-100 transition-all shadow-sm mb-4 btn-bounce">
-                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg> เข้าสู่ระบบ Gmail
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+                เข้าสู่ระบบ Gmail
             </button>
             <button onclick="openHistoryModal()" class="w-full mb-4 flex items-center justify-center gap-2 bg-slate-50 text-slate-500 border border-transparent py-2 rounded-xl text-xs font-bold hover:bg-slate-100 transition-all shadow-sm btn-bounce">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> ประวัติ (Guest)
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                ประวัติ (Guest)
             </button>
         `;
     }
-    
-    if(pcContainer) pcContainer.innerHTML = html;
-    if(mobileContainer) mobileContainer.innerHTML = html;
 }
 
 // --- USER PROFILE & SHOP SETTINGS ---
@@ -137,12 +148,16 @@ function openEditProfile() {
     const modal = document.getElementById('editProfileModal');
     if(!modal) return;
     modal.classList.remove('hidden');
-    // ... (Keep existing logic) ...
+    // ปิดเมนู Bottom Sheet ถ้าเปิดอยู่
+    const sheet = document.getElementById('mainMenuSheet');
+    if(sheet) sheet.classList.add('hidden');
+
     const nameInput = document.getElementById('edit-profile-name');
     const shopNameInput = document.getElementById('edit-shop-name');
     const shopAddrInput = document.getElementById('edit-shop-address');
     const logoPreview = document.getElementById('logo-preview');
     const logoInput = document.getElementById('edit-shop-logo-base64');
+
     if(currentUserProfile) {
         nameInput.value = currentUserProfile.displayName || currentUser.displayName || '';
         shopNameInput.value = currentUserProfile.shopName || '';
@@ -158,11 +173,19 @@ function openEditProfile() {
         nameInput.value = currentUser.displayName || '';
     }
 }
-function closeEditProfile() { document.getElementById('editProfileModal').classList.add('hidden'); }
+
+function closeEditProfile() {
+    document.getElementById('editProfileModal').classList.add('hidden');
+}
+
 function handleLogoUpload(input) {
     if (input.files && input.files[0]) {
         const file = input.files[0];
-        if (file.size > 500 * 1024) { alert("ขนาดไฟล์รูปภาพต้องไม่เกิน 500KB"); input.value = ''; return; }
+        if (file.size > 500 * 1024) {
+            alert("ขนาดไฟล์รูปภาพต้องไม่เกิน 500KB");
+            input.value = '';
+            return;
+        }
         const reader = new FileReader();
         reader.onload = function(e) {
             const base64 = e.target.result;
@@ -173,6 +196,7 @@ function handleLogoUpload(input) {
         reader.readAsDataURL(file);
     }
 }
+
 function saveUserProfile() {
     if(!auth.currentUser) return;
     const uid = auth.currentUser.uid;
@@ -180,61 +204,73 @@ function saveUserProfile() {
     const shopName = document.getElementById('edit-shop-name').value.trim();
     const address = document.getElementById('edit-shop-address').value.trim();
     const logo = document.getElementById('edit-shop-logo-base64').value;
-    const dataToSave = { displayName: name, shopName: shopName, shopAddress: address, shopLogo: logo };
+
+    const dataToSave = {
+        displayName: name,
+        shopName: shopName,
+        shopAddress: address,
+        shopLogo: logo
+    };
+
     db.collection('users').doc(uid).set(dataToSave, { merge: true }).then(() => {
         showToast("บันทึกข้อมูลเรียบร้อย");
         closeEditProfile();
         currentUserProfile = dataToSave;
-        // Refresh UI
-        const pcProfile = document.getElementById('user-profile-section-pc');
-        const mobileProfile = document.getElementById('user-profile-section-mobile');
-        renderUserProfileDual(currentUser, pcProfile, mobileProfile);
-    }).catch(e => { alert("เกิดข้อผิดพลาด: " + e.message); });
+        renderUserSidebar(currentUser);
+    }).catch(e => {
+        alert("เกิดข้อผิดพลาด: " + e.message);
+    });
 }
 
-// --- RENDER SIDEBAR & BOTTOM SHEET (CORE LOGIC) ---
+// --- RENDER MENU & SIDEBAR (UPDATED FOR PC & MOBILE) ---
 function renderSidebar() {
-    // 1. Render for PC
+    // 1. PC Sidebar Container
     const pcContainer = document.getElementById('sidebar-menu-container-pc');
-    const pcProfile = document.getElementById('user-profile-section-pc');
-    
-    // 2. Render for Mobile (Bottom Sheet)
+    // 2. Mobile Menu Grid
     const mobileMenuGrid = document.getElementById('mobile-menu-grid');
     const mobileCalcGrid = document.getElementById('mobile-calc-grid');
-    const mobileProfile = document.getElementById('user-profile-section-mobile');
-
-    // Safety check
+    
+    // Safety check for menus
     const menus = (appConfig && appConfig.menus) ? appConfig.menus : [];
     
-    // --- PC RENDER ---
+    // --- Render for PC ---
     if (pcContainer) {
-        let pcHtml = `<div class="px-6 mb-3 text-xs font-bold text-slate-400 uppercase tracking-wider">เช็คสต็อกสินค้า</div>`;
+        let html = `<div class="px-6 mb-3 text-xs font-bold text-slate-400 uppercase tracking-wider">เช็คสต็อกสินค้า</div>`;
         menus.forEach(menu => {
             if (!menu.active) return;
-            const activeClass = currentSystem === menu.id ? 'bg-red-50 text-sunny-red border-sunny-red' : 'border-transparent text-slate-600 hover:bg-red-100 hover:text-red-700 hover:border-red-600';
+            const activeClass = currentSystem === menu.id 
+                ? 'bg-red-50 text-sunny-red border-sunny-red' 
+                : 'border-transparent text-slate-600 hover:bg-red-100 hover:text-red-700 hover:border-red-600';
             const iconSvg = ICONS[menu.icon] || ICONS['wood'];
-            pcHtml += `<a href="#" onclick="switchSystem('${menu.id}')" class="menu-item ${activeClass} group flex items-center px-6 py-3 transition-all duration-200 ease-out border-l-4"><div class="w-8 flex justify-center mr-2">${iconSvg}</div><span class="font-medium text-sm">${menu.name}</span></a>`;
+            html += `
+                <a href="#" onclick="switchSystem('${menu.id}')" class="menu-item ${activeClass} group flex items-center px-6 py-3 transition-all duration-200 ease-out border-l-4">
+                    <div class="w-8 flex justify-center mr-2 transition-transform group-hover:scale-110 duration-200">${iconSvg}</div>
+                    <div class="flex flex-col"><span class="font-medium text-sm">${menu.name}</span>${menu.sub?`<span class="text-[10px] text-slate-400 group-hover:text-red-600 transition-colors">${menu.sub}</span>`:''}</div>
+                </a>`;
         });
         
-        // Add Calc Menu for PC
+        // Add Calculator Menu for PC
         const isAdmin = localStorage.getItem('isAdminLoggedIn') === 'true';
         if ((appConfig && appConfig.calcSettings && appConfig.calcSettings.enabled) || isAdmin) {
-             pcHtml += `<div class="px-6 mt-6 mb-3 text-xs font-bold text-slate-400 uppercase tracking-wider flex justify-between"><span>ระบบคำนวณราคา</span>${(!appConfig || !appConfig.calcSettings || !appConfig.calcSettings.enabled) ? '<span class="text-[9px] bg-red-100 text-red-500 px-1 rounded">Admin Only</span>' : ''}</div>`;
-             const calcClass = "group flex items-center px-6 py-3 text-slate-600 hover:bg-indigo-50 hover:text-indigo-900 transition-all duration-200 ease-out border-l-4 border-transparent hover:border-indigo-900";
-             // ... (PC Calc Icons logic same as before, simplified for brevity) ...
-             const calcItems = [
-                 {id:'EXT', name:'ม่านม้วนภายนอก', icon:'🪟'}, {id:'INT', name:'ม่านม้วนภายใน', icon:'🏠'},
-                 {id:'PVC_CALC', name:'ฉากกั้นห้อง PVC', icon:'🚪'}, {id:'WOOD_CALC', name:'มู่ลี่ไม้', icon:'🪵'},
-                 {id:'ALU25', name:'มู่ลี่อลูมิเนียม', icon:'⚙️'}
-             ];
-             calcItems.forEach(c => {
-                 pcHtml += `<a href="#" onclick="switchCalcMode('${c.id}')" class="${calcClass}"><div class="w-8 flex justify-center mr-2 text-xl">${c.icon}</div><span class="font-medium text-sm">${c.name}</span></a>`;
-             });
+            html += `<div class="px-6 mt-6 mb-3 text-xs font-bold text-slate-400 uppercase tracking-wider flex justify-between"><span>ระบบคำนวณราคา</span>${(!appConfig || !appConfig.calcSettings || !appConfig.calcSettings.enabled) ? '<span class="text-[9px] bg-red-100 text-red-500 px-1 rounded">Admin Only</span>' : ''}</div>`;
+            const calcClass = "group flex items-center px-6 py-3 text-slate-600 hover:bg-indigo-50 hover:text-indigo-900 transition-all duration-200 ease-out border-l-4 border-transparent hover:border-indigo-900";
+            
+            const calcs = [
+                { id:'EXT', name:'ม่านม้วนภายนอก', icon:'roller' },
+                { id:'INT', name:'ม่านม้วนภายใน', icon:'roller' },
+                { id:'PVC_CALC', name:'ฉากกั้นห้อง PVC', icon:'curtain' },
+                { id:'WOOD_CALC', name:'มู่ลี่ไม้', icon:'wood' },
+                { id:'ALU25', name:'มู่ลี่อลูมิเนียม', icon:'wood' }
+            ];
+            
+            calcs.forEach(c => {
+                html += `<a href="#" onclick="switchCalcMode('${c.id}')" class="${calcClass}"><div class="w-8 flex justify-center mr-2 transition-transform group-hover:scale-110 duration-200">${ICONS[c.icon]}</div><span class="font-medium text-sm transition-transform group-hover:translate-x-1 duration-200">${c.name}</span></a>`;
+            });
         }
-        pcContainer.innerHTML = pcHtml;
+        pcContainer.innerHTML = html;
     }
 
-    // --- MOBILE RENDER (GRID ICON) ---
+    // --- Render for Mobile (Bottom Sheet) ---
     if (mobileMenuGrid) {
         let mobileHtml = '';
         menus.forEach(menu => {
@@ -251,60 +287,45 @@ function renderSidebar() {
         });
         mobileMenuGrid.innerHTML = mobileHtml;
     }
-    
+
     if (mobileCalcGrid) {
-        const calcTypes = [
-            { id: 'EXT', name: 'ม่านม้วนภายนอก', icon: '🪟' },
-            { id: 'INT', name: 'ม่านม้วนภายใน', icon: '🏠' },
-            { id: 'PVC_CALC', name: 'ฉาก PVC', icon: '🚪' },
-            { id: 'WOOD_CALC', name: 'มู่ลี่ไม้', icon: '🪵' },
-            { id: 'ALU25', name: 'อลูมิเนียม', icon: '⚙️' }
+         const calcs = [
+            { id:'EXT', name:'ม่านม้วนภายนอก', icon:'🪟' },
+            { id:'INT', name:'ม่านม้วนภายใน', icon:'🏠' },
+            { id:'PVC_CALC', name:'ฉาก PVC', icon:'🚪' },
+            { id:'WOOD_CALC', name:'มู่ลี่ไม้', icon:'🪵' },
+            { id:'ALU25', name:'อลูมิเนียม', icon:'⚙️' }
         ];
         let calcHtml = '';
-        calcTypes.forEach(t => {
+        calcs.forEach(c => {
             calcHtml += `
-                <button onclick="switchCalcMode('${t.id}'); toggleMainMenuSheet()" class="flex flex-col items-center gap-2 group">
+                <button onclick="switchCalcMode('${c.id}'); toggleMainMenuSheet()" class="flex flex-col items-center gap-2 group">
                     <div class="w-14 h-14 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-600 group-active:bg-indigo-600 group-active:text-white transition-colors border border-indigo-100 shadow-sm">
-                        <span class="text-2xl">${t.icon}</span>
+                        <span class="text-2xl">${c.icon}</span>
                     </div>
-                    <span class="text-xs font-medium text-slate-600 text-center leading-tight truncate w-full">${t.name}</span>
+                    <span class="text-xs font-medium text-slate-600 text-center leading-tight truncate w-full">${c.name}</span>
                 </button>
             `;
         });
         mobileCalcGrid.innerHTML = calcHtml;
     }
 
-    // --- RENDER PROFILE ---
-    if(typeof renderUserProfileDual === 'function') {
-        renderUserProfileDual(currentUser, pcProfile, mobileProfile); 
-    }
-    
-    // Update Title
     const titleEl = document.getElementById('app-title-display');
     if(titleEl && appConfig) titleEl.innerText = appConfig.appTitle;
     
+    renderUserSidebar(currentUser);
     checkPwaStatus();
 }
 
 function toggleMainMenuSheet() {
     const sheet = document.getElementById('mainMenuSheet');
-    if(sheet) {
-        sheet.classList.toggle('hidden');
-        // Add animation class if opening
-        if(!sheet.classList.contains('hidden')) {
-            const inner = sheet.querySelector('.bg-white');
-            inner.classList.remove('animate-slide-down');
-            inner.classList.add('animate-slide-up');
-        }
-    }
+    if(sheet) sheet.classList.toggle('hidden');
 }
 
 function toggleHistorySheet() {
-    // Reuse existing history modal
     openHistoryModal();
 }
 
-// --- RENDER NEWS ---
 function renderNews() {
     const container = document.getElementById('news-container');
     const pinnedWrapper = document.getElementById('pinned-news-wrapper');
@@ -383,7 +404,7 @@ function renderNews() {
     }
 }
 
-// --- ADMIN FUNCTIONS (FULL RESTORED) ---
+// --- ADMIN FUNCTIONS ---
 function checkAdminLogin() { if (localStorage.getItem('isAdminLoggedIn') === 'true') { openConfig(); } else { openAdminLogin(); } }
 function openAdminLogin() { document.getElementById('adminLoginModal').classList.remove('hidden'); document.getElementById('adminPassword').value=''; document.getElementById('loginError').classList.add('hidden'); document.getElementById('adminPassword').focus(); }
 function closeAdminLogin() { document.getElementById('adminLoginModal').classList.add('hidden'); }
@@ -391,16 +412,20 @@ function handleLogin() { if(document.getElementById('adminPassword').value === '
 function logoutAdmin() { localStorage.removeItem('isAdminLoggedIn'); closeConfig(); showToast("ออกจากระบบแล้ว"); renderSidebar(); }
 
 function openConfig() { 
-    tempConfig = JSON.parse(JSON.stringify(appConfig)); 
+    tempConfig = JSON.parse(JSON.stringify(appConfig || {}));
     if(!tempConfig.menus) tempConfig.menus = [];
     if(!tempConfig.newsItems) tempConfig.newsItems = [];
     if(!tempConfig.calcSettings) tempConfig.calcSettings = { enabled: true, wood: {}, pvc: {}, roller: {} };
-    if(!tempConfig.newsSettings) tempConfig.newsSettings = { speed: 3 };
     if(!tempConfig.features) tempConfig.features = {};
+    if(!tempConfig.newsSettings) tempConfig.newsSettings = { speed: 3 };
 
     const modal = document.getElementById('adminConfigModal'); 
     if(modal) modal.classList.remove('hidden'); 
     
+    // Close mobile sheet if open
+    const sheet = document.getElementById('mainMenuSheet');
+    if(sheet) sheet.classList.add('hidden');
+
     const titleInp = document.getElementById('conf-app-title'); 
     if(titleInp) titleInp.value = tempConfig.appTitle || 'SUNNY Stock'; 
     
@@ -467,14 +492,18 @@ function switchAdminTab(tab) {
     if(tab === 'dashboard') renderAdminDashboard(); 
 }
 
+function toggleSidebar() { const sb = document.getElementById('sidebar'); const ov = document.getElementById('sidebarOverlay'); sb.classList.toggle('-translate-x-full'); ov.classList.toggle('hidden'); }
+function requestNotificationPermission() { if (!("Notification" in window)) return alert("อุปกรณ์ไม่รองรับ"); Notification.requestPermission().then(p => { if (p === "granted") showToast("เปิดแจ้งเตือนแล้ว"); else alert("กรุณากดอนุญาตเพื่อรับแจ้งเตือน"); renderSidebar(); }); }
+function checkAndNotifyNews(newsItems) { if (!newsItems || newsItems.length === 0) return; const latest = [...newsItems].sort((a,b) => b.id - a.id)[0]; const lastId = parseInt(localStorage.getItem('last_notified_news_id') || '0'); if (latest.id > lastId) { if (Notification.permission === "granted") new Notification("ประกาศใหม่", { body: latest.text, icon: "https://via.placeholder.com/128" }); else showToast("ประกาศใหม่: " + latest.text); localStorage.setItem('last_notified_news_id', latest.id); } }
+function applyTheme(theme) { document.body.classList.remove('theme-christmas'); let primary = '#E63946', dark = '#1D3557', showScene = 'none'; if (theme === 'christmas') { document.body.classList.add('theme-christmas'); primary = '#D62828'; dark = '#14532D'; showScene = 'block'; } const scene = document.getElementById('xmas-scene'); if(scene) scene.style.display = showScene; document.querySelector('meta[name="theme-color"]').setAttribute("content", primary); document.documentElement.style.setProperty('--sunny-red', primary); document.documentElement.style.setProperty('--sunny-dark', dark); }
+
 // --- ADMIN RENDERERS ---
 function renderAdminCalcInputs() { 
     const container = document.getElementById('tab-content-calc'); 
     if(!container) return; 
-    const w = (tempConfig.calcSettings && tempConfig.calcSettings.wood) ? tempConfig.calcSettings.wood : {}; 
-    const p = (tempConfig.calcSettings && tempConfig.calcSettings.pvc) ? tempConfig.calcSettings.pvc : {}; 
-    const r = (tempConfig.calcSettings && tempConfig.calcSettings.roller) ? tempConfig.calcSettings.roller : {}; 
-    
+    const w = tempConfig.calcSettings.wood; 
+    const p = tempConfig.calcSettings.pvc; 
+    const r = tempConfig.calcSettings.roller; 
     container.innerHTML = `
         <div class="bg-white p-4 rounded-xl border border-slate-200 flex items-center justify-between mb-4 sticky top-0 z-10 shadow-sm"><span class="font-bold text-slate-700">เปิดใช้งานระบบคำนวณ</span><input type="checkbox" id="conf-calc-enabled" ${tempConfig.calcSettings.enabled ? 'checked' : ''} class="w-6 h-6 accent-sunny-red" onchange="tempConfig.calcSettings.enabled = this.checked"></div>
         <div class="space-y-6 pb-10">
@@ -491,7 +520,10 @@ function renderAdminMenu() {
     if (!list) return;
     list.innerHTML = '';
     
-    if(!tempConfig.menus || !Array.isArray(tempConfig.menus)) tempConfig.menus = [];
+    // Safety check for menus
+    if(!tempConfig.menus || !Array.isArray(tempConfig.menus)) {
+        tempConfig.menus = [];
+    }
 
     tempConfig.menus.forEach((menu, idx) => {
         const slots = [
@@ -515,4 +547,457 @@ function renderAdminMenu() {
                             onchange="updateMenuImage(${idx}, '${slot.key}', ${uIdx}, this.value)"
                             class="flex-1 min-w-0 p-1.5 border border-slate-200 rounded text-[10px] text-slate-600 bg-white focus:ring-1 focus:ring-sunny-red focus:outline-none placeholder:text-slate-200" 
                             placeholder="https://...">
-                        <button onclick="removeMenuImage(${idx}, '${slot.key}', ${uIdx})" class="text-slate-300 hover:text-red-500 p-1 flex items-center justify-center h-6 w-6 bg-slate-50 hover:bg-red-50 rounded transition-colors" title="ลบภาพ"><svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path
+                        <button onclick="removeMenuImage(${idx}, '${slot.key}', ${uIdx})" class="text-slate-300 hover:text-red-500 p-1 flex items-center justify-center h-6 w-6 bg-slate-50 hover:bg-red-50 rounded transition-colors" title="ลบภาพ"><svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg></button>
+                    </div>
+                `;
+            });
+
+            slotsHtml += `
+                <div class="bg-slate-50 p-2 rounded border border-slate-100 flex flex-col h-full">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-[9px] text-slate-500 font-bold">${slot.label}</span>
+                        <button onclick="addMenuImage(${idx}, '${slot.key}')" class="text-[9px] bg-white border border-slate-200 hover:border-sunny-red hover:text-sunny-red px-2 py-0.5 rounded transition-colors shadow-sm flex items-center gap-1"><span>+</span> เพิ่มภาพ</button>
+                    </div>
+                    <div class="space-y-1 flex-1 overflow-y-auto max-h-32 custom-scrollbar">
+                        ${inputsHtml.length > 0 ? inputsHtml : '<div class="text-[9px] text-slate-300 italic text-center py-4 border-2 border-dashed border-slate-100 rounded">ไม่มีรูปภาพ</div>'}
+                    </div>
+                </div>
+            `;
+        });
+
+        list.innerHTML += `
+            <div class="bg-white p-3 rounded-xl border border-slate-200 flex flex-col gap-3">
+                <div class="flex items-center gap-3">
+                    <div class="p-2 bg-slate-100 rounded text-slate-500">${ICONS[menu.icon]||'?'}</div>
+                    <div class="flex-grow space-y-1">
+                        <input type="text" value="${menu.name}" onchange="tempConfig.menus[${idx}].name=this.value" class="w-full p-1 border rounded text-sm font-bold">
+                        <input type="text" value="${menu.sub}" onchange="tempConfig.menus[${idx}].sub=this.value" class="w-full p-1 border rounded text-xs text-slate-500">
+                    </div>
+                    <div class="flex flex-col items-center">
+                        <input type="checkbox" ${menu.active?'checked':''} onchange="tempConfig.menus[${idx}].active=this.checked" class="w-5 h-5 accent-sunny-red cursor-pointer">
+                        <span class="text-[8px] text-slate-400 mt-1">แสดง</span>
+                    </div>
+                </div>
+                <div class="space-y-2">
+                    <label class="text-[10px] font-bold text-slate-400 block">จัดการภาพพื้นหลัง (แยก 3 ช่องอิสระ)</label>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
+                        ${slotsHtml}
+                    </div>
+                    <div class="text-[9px] text-slate-400 mt-1">* กดปุ่มเพิ่มภาพเพื่อใส่ URL รูปภาพใหม่ โดยระบบจะสไลด์รูปวนไปตามลำดับ</div>
+                </div>
+            </div>`;
+    });
+}
+
+// Helpers attached to window for inline onclicks in Admin Menu
+window.addMenuImage = (menuIdx, slotKey) => {
+    let current = tempConfig.menus[menuIdx][slotKey] || '';
+    let arr = current.split(',').map(s => s.trim());
+    if (arr.length === 1 && arr[0] === '') arr = [];
+    arr.push(''); 
+    if(arr.length === 1 && arr[0] === '') tempConfig.menus[menuIdx][slotKey] = ' '; 
+    else tempConfig.menus[menuIdx][slotKey] = arr.join(',');
+    renderAdminMenu();
+};
+
+window.updateMenuImage = (menuIdx, slotKey, imgIdx, newValue) => {
+    let current = tempConfig.menus[menuIdx][slotKey] || '';
+    let arr = current.split(','); 
+    arr = arr.map(s => s.trim());
+    if (arr.length === 1 && arr[0] === '') arr = [];
+    while(arr.length <= imgIdx) arr.push('');
+    arr[imgIdx] = newValue.trim();
+    tempConfig.menus[menuIdx][slotKey] = arr.join(',');
+};
+
+window.removeMenuImage = (menuIdx, slotKey, imgIdx) => {
+    let current = tempConfig.menus[menuIdx][slotKey] || '';
+    let arr = current.split(',').map(s => s.trim());
+    if (arr.length === 1 && arr[0] === '') arr = [];
+    arr.splice(imgIdx, 1);
+    tempConfig.menus[menuIdx][slotKey] = arr.join(',');
+    renderAdminMenu();
+};
+
+function renderAdminNews() {
+    const list = document.getElementById('admin-news-list'); 
+    list.innerHTML = '';
+    
+    // Safety check for newsItems
+    if(!tempConfig.newsItems || !Array.isArray(tempConfig.newsItems)) {
+        tempConfig.newsItems = [];
+    }
+
+    const sorted = [...tempConfig.newsItems].sort((a,b) => (b.pinned===a.pinned)? 0 : b.pinned? 1 : -1);
+    
+    sorted.forEach((item, idx) => {
+        const realIdx = tempConfig.newsItems.findIndex(x => x.id === item.id);
+        
+        let emojiGridText = EMOJI_LIST.map(e => `<button onclick="insertEmoji(${realIdx}, '${e}', 'text')" class="text-xl hover:bg-slate-100 p-2 rounded transition-colors">${e}</button>`).join('');
+        let emojiGridBadge = EMOJI_LIST.map(e => `<button onclick="insertEmoji(${realIdx}, '${e}', 'badge')" class="text-xl hover:bg-slate-100 p-2 rounded transition-colors">${e}</button>`).join('');
+
+        const createToolbar = (type) => `
+            <div class="flex gap-1 mb-1.5 flex-wrap items-center">
+                <button onmousedown="event.preventDefault()" onclick="execCmd('bold')" class="px-2 py-1 bg-white border border-slate-200 rounded text-[10px] font-bold hover:bg-slate-50 hover:text-sunny-red min-w-[24px]">B</button>
+                <button onmousedown="event.preventDefault()" onclick="execCmd('italic')" class="px-2 py-1 bg-white border border-slate-200 rounded text-[10px] italic hover:bg-slate-50 hover:text-sunny-red min-w-[24px]">I</button>
+                <button onmousedown="event.preventDefault()" onclick="execCmd('underline')" class="px-2 py-1 bg-white border border-slate-200 rounded text-[10px] underline hover:bg-slate-50 hover:text-sunny-red min-w-[24px]">U</button>
+                <div class="w-px h-6 bg-slate-200 mx-1"></div>
+                <button onmousedown="event.preventDefault()" onclick="document.getElementById('emoji-picker-${type === 'badge' ? 'badge-' : ''}${realIdx}').classList.toggle('hidden')" class="px-2 py-1 bg-white border border-slate-200 rounded text-[10px] hover:bg-slate-50 hover:text-sunny-red">😀</button>
+            </div>
+        `;
+
+        list.innerHTML += `
+            <div class="p-4 rounded-xl border ${item.pinned ? 'bg-red-50 border-red-200' : 'bg-slate-50 border-slate-200'} relative group shadow-sm mb-4">
+                <div class="flex flex-col gap-3">
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="flex-1 space-y-2">
+                            <div class="flex justify-between items-end"><label class="text-[10px] text-slate-400 font-bold uppercase">ข้อความประกาศ</label></div>
+                            ${createToolbar('text')}
+                            <div class="relative">
+                                <div id="news-edit-${realIdx}" contenteditable="true" class="w-full p-2 text-sm border rounded bg-white focus:outline-none focus:ring-1 focus:ring-sunny-red min-h-[60px] max-h-32 overflow-y-auto font-sans" oninput="tempConfig.newsItems[${realIdx}].text = this.innerHTML">${item.text}</div>
+                                <div id="emoji-picker-${realIdx}" class="hidden absolute top-8 left-0 z-50 bg-white border border-slate-200 shadow-xl rounded-xl p-2 w-64 mt-1">
+                                    <div class="flex justify-between items-center px-2 pb-2 border-b border-slate-100 mb-2"><span class="text-xs font-bold text-slate-400">เลือก Emoji</span><button onclick="document.getElementById('emoji-picker-${realIdx}').classList.add('hidden')" class="text-slate-300 hover:text-red-500 text-xs">✕</button></div>
+                                    <div class="grid grid-cols-5 gap-1 max-h-48 overflow-y-auto custom-scrollbar">${emojiGridText}</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex flex-col gap-2 pt-8">
+                            <button onclick="togglePinNews(${realIdx})" class="${item.pinned?'text-white bg-sunny-red':'text-slate-400 bg-white border'} p-2 rounded-lg shadow-sm transition-all hover:scale-105" title="${item.pinned?'ยกเลิกปักหมุด':'ปักหมุด'}"><svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20"><path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z"/></svg></button>
+                            <button onclick="deleteNews(${realIdx})" class="text-slate-400 hover:text-red-500 bg-white border p-2 rounded-lg shadow-sm transition-all hover:scale-105" title="ลบ"><svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 border-t border-slate-200 pt-3 mt-1">
+                        <div class="relative">
+                            <label class="block text-[10px] text-slate-500 font-bold mb-1">ข้อความป้าย (Badge)</label>
+                            <div class="flex items-center gap-1 mb-1">
+                                <button onmousedown="event.preventDefault()" onclick="document.getElementById('emoji-picker-badge-${realIdx}').classList.toggle('hidden')" class="p-1 bg-white border border-slate-200 rounded text-[10px] hover:bg-slate-50">😀</button>
+                            </div>
+                            <div id="badge-edit-${realIdx}" contenteditable="true" class="w-full p-1.5 text-xs border rounded focus:outline-none focus:ring-1 focus:ring-sunny-red font-bold text-slate-600 bg-white min-h-[30px] whitespace-nowrap overflow-hidden" oninput="tempConfig.newsItems[${realIdx}].badgeLabel = this.innerHTML">${item.badgeLabel}</div>
+                            <div id="emoji-picker-badge-${realIdx}" class="hidden absolute bottom-full left-0 mb-1 z-50 bg-white border border-slate-200 shadow-xl rounded-xl p-2 w-64">
+                                <div class="flex justify-between items-center px-2 pb-2 border-b border-slate-100 mb-2"><span class="text-xs font-bold text-slate-400">Emoji (ป้าย)</span><button onclick="document.getElementById('emoji-picker-badge-${realIdx}').classList.add('hidden')" class="text-slate-300 hover:text-red-500 text-xs">✕</button></div>
+                                <div class="grid grid-cols-5 gap-1 max-h-48 overflow-y-auto custom-scrollbar">${emojiGridBadge}</div>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-slate-500 font-bold mb-1">สีพื้นหลังป้าย</label>
+                            <div class="flex items-center gap-2">
+                                <input type="color" value="${item.badgeColor}" onchange="tempConfig.newsItems[${realIdx}].badgeColor=this.value" class="h-8 w-10 border rounded cursor-pointer p-0 overflow-hidden">
+                                <span class="text-[10px] text-slate-400 font-mono">${item.badgeColor}</span>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-slate-500 font-bold mb-1">สีตัวอักษรป้าย</label>
+                            <div class="flex items-center gap-2">
+                                <input type="color" value="${item.badgeTextColor}" onchange="tempConfig.newsItems[${realIdx}].badgeTextColor=this.value" class="h-8 w-10 border rounded cursor-pointer p-0 overflow-hidden">
+                                <span class="text-[10px] text-slate-400 font-mono">${item.badgeTextColor}</span>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-slate-500 font-bold mb-1">สีข้อความหลัก</label>
+                            <div class="flex items-center gap-2">
+                                <input type="color" value="${item.textColor}" onchange="tempConfig.newsItems[${realIdx}].textColor=this.value" class="h-8 w-10 border rounded cursor-pointer p-0 overflow-hidden">
+                                <span class="text-[10px] text-slate-400 font-mono">${item.textColor}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex justify-end pt-2 border-t border-slate-100 border-dashed">
+                        <div class="flex items-center gap-2">
+                            <label class="text-[10px] text-slate-400">วันที่:</label>
+                            <input type="date" value="${item.date.split('T')[0]}" onchange="tempConfig.newsItems[${realIdx}].date=this.value" class="text-xs border rounded p-1 text-slate-500 bg-slate-50">
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+    });
+}
+
+function togglePinNews(idx) {
+    tempConfig.newsItems[idx].pinned = !tempConfig.newsItems[idx].pinned;
+    renderAdminNews();
+}
+
+function addNewNewsItem() { 
+    tempConfig.newsItems.unshift({ 
+        id: Date.now(), 
+        text: "ประกาศใหม่...", 
+        date: new Date().toISOString(), 
+        pinned: false, 
+        badgeLabel: "NEW!", 
+        badgeColor: "#E63946", 
+        badgeTextColor: "#FFFFFF", 
+        textColor: "#334155" 
+    }); 
+    renderAdminNews(); 
+}
+
+function deleteNews(idx) { 
+    if(confirm('ลบประกาศนี้?')) {
+        tempConfig.newsItems.splice(idx, 1); 
+        renderAdminNews(); 
+    }
+}
+
+// --- DASHBOARD RENDERER ---
+async function renderAdminDashboard() {
+    const container = document.getElementById('tab-content-dashboard');
+    if (!container) return;
+
+    container.innerHTML = `<div class="flex flex-col items-center justify-center h-64"><span class="loader w-10 h-10 border-4 border-slate-200 border-t-sunny-red rounded-full mb-4"></span><span class="text-slate-400">กำลังประมวลผลข้อมูล...</span></div>`;
+
+    try {
+        let quotes = tempQuotes;
+        if (!quotes || quotes.length === 0) {
+            if (db && auth && auth.currentUser) {
+                const snap = await db.collection("quotations").get();
+                quotes = [];
+                snap.forEach(doc => quotes.push({ ...doc.data(), docId: doc.id }));
+            } else {
+                quotes = JSON.parse(localStorage.getItem('sunny_quotations')) || [];
+            }
+            tempQuotes = quotes;
+        }
+
+        const totalDocs = quotes.length;
+        let totalValue = 0;
+        let woodCount = 0, pvcCount = 0, rollerCount = 0, aluCount = 0;
+        
+        const last7Days = {};
+        for(let i=6; i>=0; i--) {
+            const d = new Date(); d.setDate(d.getDate() - i);
+            const k = d.toLocaleDateString('th-TH');
+            last7Days[k] = 0;
+        }
+
+        quotes.forEach(q => {
+            const amount = parseFloat((q.total || "0").toString().replace(/,/g, '').replace(/[^0-9.]/g, '')) || 0;
+            totalValue += amount;
+
+            if (q.type.includes('ไม้')) woodCount++;
+            else if (q.type.includes('PVC') || q.type.includes('ฉาก')) pvcCount++;
+            else if (q.type.includes('ม่านม้วน')) rollerCount++;
+            else aluCount++;
+
+            const qDate = new Date(q.date || q.id).toLocaleDateString('th-TH');
+            if (last7Days[qDate] !== undefined) last7Days[qDate] += amount;
+        });
+
+        const recent = [...quotes].sort((a,b) => (b.id||0) - (a.id||0)).slice(0, 5);
+
+        container.innerHTML = `
+            <div class="max-w-5xl mx-auto space-y-6">
+                <div class="flex justify-between items-center mb-2">
+                    <div><h3 class="text-2xl font-black text-slate-800">Overview</h3><p class="text-xs text-slate-400">ภาพรวมระบบล่าสุด</p></div>
+                    <div class="text-right"><div class="text-xs font-bold text-slate-400">อัพเดทล่าสุด</div><div class="text-sm font-bold text-slate-600">${new Date().toLocaleTimeString('th-TH')}</div></div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="rounded-2xl p-5 bg-gradient-to-br from-pink-500 to-rose-600 text-white shadow-lg relative overflow-hidden group">
+                        <div class="relative z-10">
+                            <div class="text-xs font-medium opacity-80 mb-1">ยอดเสนอราคา (ทั้งหมด)</div>
+                            <div class="text-2xl font-black tracking-tight">${totalValue.toLocaleString(undefined, {maximumFractionDigits:0})} ฿</div>
+                            <div class="mt-2 text-[10px] bg-white/20 inline-block px-2 py-0.5 rounded backdrop-blur-sm">System Total</div>
+                        </div>
+                    </div>
+                    <div class="rounded-2xl p-5 bg-gradient-to-br from-violet-500 to-purple-600 text-white shadow-lg relative overflow-hidden group">
+                        <div class="relative z-10">
+                            <div class="text-xs font-medium opacity-80 mb-1">จำนวนใบเสนอราคา</div>
+                            <div class="text-2xl font-black tracking-tight">${totalDocs} ใบ</div>
+                            <div class="mt-2 text-[10px] bg-white/20 inline-block px-2 py-0.5 rounded backdrop-blur-sm">+${recent.length} Recent</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                    <div class="p-6 border-b border-slate-100 flex justify-between items-center"><h4 class="font-bold text-slate-700">รายการล่าสุด (Recent Activity)</h4><button onclick="switchAdminTab('saved')" class="text-xs text-sunny-red font-bold hover:underline">ดูทั้งหมด</button></div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left">
+                            <thead class="bg-slate-50 text-slate-500 font-bold border-b border-slate-100">
+                                <tr><th class="px-6 py-4">ID / วันที่</th><th class="px-6 py-4">ลูกค้า / เจ้าของ</th><th class="px-6 py-4">ประเภท</th><th class="px-6 py-4 text-right">ยอดรวม</th><th class="px-6 py-4 text-center">สถานะ</th></tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 text-slate-600">
+                                ${recent.map(r => `
+                                    <tr class="hover:bg-slate-50 transition-colors">
+                                        <td class="px-6 py-4"><div class="font-bold text-slate-700">#${(r.id || '').toString().slice(-4)}</div><div class="text-[10px] text-slate-400">${new Date(r.date).toLocaleDateString('th-TH')}</div></td>
+                                        <td class="px-6 py-4"><div class="font-bold text-slate-700">${r.ownerName || 'Guest User'}</div><div class="text-[10px] text-slate-400">${r.ownerEmail || 'Local Device'}</div></td>
+                                        <td class="px-6 py-4"><span class="bg-slate-100 text-slate-600 px-2 py-1 rounded text-xs font-bold">${r.type}</span></td>
+                                        <td class="px-6 py-4 text-right font-bold text-slate-700">${r.total}</td>
+                                        <td class="px-6 py-4 text-center"><span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold ${r.uid ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-500'}"><span class="w-1.5 h-1.5 rounded-full ${r.uid ? 'bg-green-500' : 'bg-gray-400'}"></span>${r.uid ? 'Online' : 'Local'}</span></td>
+                                    </tr>
+                                `).join('')}
+                                ${recent.length === 0 ? '<tr><td colspan="5" class="px-6 py-8 text-center text-slate-400">ยังไม่มีข้อมูล</td></tr>' : ''}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        `;
+    } catch (e) {
+        console.error("Dashboard Error:", e);
+        container.innerHTML = `<div class="text-center text-red-400 py-10">เกิดข้อผิดพลาดในการโหลดข้อมูล: ${e.message}</div>`;
+    }
+}
+
+// --- PWA INSTALLATION & IOS SUPPORT ---
+let deferredPrompt;
+
+function isIOS() {
+    return [
+        'iPad Simulator',
+        'iPhone Simulator',
+        'iPod Simulator',
+        'iPad',
+        'iPhone',
+        'iPod'
+    ].includes(navigator.platform) || (navigator.userAgent.includes("Mac") && "ontouchend" in document);
+}
+
+function checkPwaStatus() { 
+    const sidebarBtn = document.getElementById('pwaInstallBtn'); 
+    const headerBtn = document.getElementById('headerInstallBtn'); 
+    const isDeviceIOS = isIOS();
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+
+    if(isStandalone) { 
+        if(sidebarBtn) sidebarBtn.classList.add('hidden'); 
+        if(headerBtn) headerBtn.classList.add('hidden'); 
+        return; 
+    } 
+    
+    // Always show install button if not installed
+    if(headerBtn) headerBtn.classList.remove('hidden'); 
+    if(sidebarBtn) sidebarBtn.classList.remove('hidden');
+
+    if (isDeviceIOS) {
+        const showIOSGuide = () => {
+            const modal = document.getElementById('installGuideModal');
+            const title = document.getElementById('installGuideTitle');
+            const instructions = document.getElementById('installInstructions');
+            if (modal && title && instructions) {
+                title.innerText = "ติดตั้งบน iOS (iPhone/iPad)";
+                instructions.innerHTML = `<div class="flex flex-col gap-4 items-center text-center"><p class="text-sunny-red font-bold">iOS ไม่รองรับการติดตั้งอัตโนมัติ</p><p>กรุณาทำตามขั้นตอน:</p><div class="flex items-center gap-3 text-left bg-slate-50 p-3 rounded-xl w-full border border-slate-100"><span class="text-2xl">1️⃣</span><span class="text-sm">แตะปุ่ม <strong>แชร์ (Share)</strong> <br><span class="text-xs text-slate-400">ไอคอนสี่เหลี่ยมมีลูกศรชี้ขึ้น</span></span></div><div class="flex items-center gap-3 text-left bg-slate-50 p-3 rounded-xl w-full border border-slate-100"><span class="text-2xl">2️⃣</span><span class="text-sm">เลือก <strong>"เพิ่มไปยังหน้าจอโฮม"</strong> <br><span class="text-xs text-slate-400">(Add to Home Screen)</span></span></div><div class="text-xs text-slate-400 mt-2">กด "เพิ่ม" ที่มุมขวาบน</div></div>`;
+                modal.classList.remove('hidden');
+            }
+        };
+        if(headerBtn) headerBtn.onclick = showIOSGuide;
+        if(sidebarBtn) sidebarBtn.onclick = showIOSGuide;
+    } else {
+        const handleInstall = () => {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then((choiceResult) => {
+                    if (choiceResult.outcome === 'accepted') checkPwaStatus();
+                    deferredPrompt = null;
+                });
+            } else {
+                document.getElementById('installGuideModal').classList.remove('hidden');
+                const title = document.getElementById('installGuideTitle');
+                if(title) title.innerText = "ติดตั้งแอพ";
+                const instructions = document.getElementById('installInstructions');
+                if(instructions) instructions.innerHTML = "หากไม่ขึ้นปุ่มติดตั้งอัตโนมัติ<br>ให้กดเมนูเบราว์เซอร์ แล้วเลือก <strong>'Install App'</strong> หรือ <strong>'Add to Home Screen'</strong>";
+            }
+        };
+        if(headerBtn) headerBtn.onclick = handleInstall;
+        if(sidebarBtn) sidebarBtn.onclick = handleInstall;
+    }
+}
+
+window.addEventListener('beforeinstallprompt', (e) => { 
+    e.preventDefault(); 
+    deferredPrompt = e; 
+    checkPwaStatus(); 
+});
+
+window.addEventListener('appinstalled', () => { 
+    console.log('App installed'); 
+    checkPwaStatus(); 
+});
+
+// --- GENERATE MANIFEST & ICONS ---
+const iconSvgUrl = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' fill='%23E63946' rx='80'/%3E%3Ctext x='50%25' y='55%25' dominant-baseline='middle' text-anchor='middle' fill='white' font-family='Arial, sans-serif' font-weight='900' font-style='normal' font-size='380'%3ES%3C/text%3E%3C/svg%3E";
+const manifestData = { name: "SUNNY Stock", short_name: "SUNNY", start_url: ".", display: "standalone", background_color: "#FFFFFF", theme_color: "#E63946", icons: [{ src: iconSvgUrl, sizes: "192x192 512x512", type: "image/svg+xml", purpose: "any maskable" }] };
+const stringManifest = JSON.stringify(manifestData);
+const blob = new Blob([stringManifest], {type: 'application/json'});
+const manifestURL = URL.createObjectURL(blob);
+document.querySelector('#manifest-placeholder').setAttribute('href', manifestURL);
+const appleIcon = document.getElementById('apple-touch-icon');
+if(appleIcon) appleIcon.setAttribute('href', iconSvgUrl);
+
+// --- APP INIT (FIXED: SPLASH SCREEN & CONFIG) ---
+function initFirebase() {
+    try {
+        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+        auth = firebase.auth();
+        db = firebase.firestore();
+
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                currentUser = user;
+                if (!user.isAnonymous) {
+                    db.collection('users').doc(user.uid).onSnapshot(doc => {
+                        currentUserProfile = doc.exists ? doc.data() : null;
+                        if(typeof renderUserSidebar === 'function') renderUserSidebar(user);
+                    });
+                }
+                if(typeof renderUserSidebar === 'function') renderUserSidebar(user);
+                
+                if (typeof configListenerSet === 'undefined' || !configListenerSet) {
+                    db.collection("app_settings").doc("config").onSnapshot((doc) => {
+                        if (doc.exists) {
+                            const newData = doc.data();
+                            if(typeof checkAndNotifyNews === 'function') checkAndNotifyNews(newData.newsItems || []);
+                            appConfig = newData;
+                            
+                            // Merge Defaults
+                            if(!appConfig.calcSettings) appConfig.calcSettings = DEFAULT_CONFIG.calcSettings;
+                            if(!appConfig.newsItems) appConfig.newsItems = [];
+                            if(!appConfig.theme) appConfig.theme = 'default';
+                            if(!appConfig.menus) appConfig.menus = DEFAULT_CONFIG.menus;
+
+                            localStorage.setItem('sunny_app_config', JSON.stringify(appConfig));
+                            
+                            // Re-render UI
+                            if(typeof renderSidebar === 'function') renderSidebar(); 
+                            if(typeof renderNews === 'function') renderNews(); 
+                            if(typeof applyTheme === 'function') applyTheme(appConfig.theme);
+                            
+                            // Re-render Admin Tabs if open
+                            if(!document.getElementById('adminConfigModal').classList.contains('hidden')) {
+                                if(typeof renderAdminMenu === 'function') renderAdminMenu();
+                                if(typeof renderAdminNews === 'function') renderAdminNews();
+                            }
+                            
+                            if(currentSystem && typeof switchSystem === 'function') switchSystem(currentSystem);
+                        } else { 
+                            db.collection("app_settings").doc("config").set(appConfig); 
+                        }
+                    }, error => console.error("Config Listener Error:", error));
+                    configListenerSet = true;
+                }
+            } else {
+                auth.signInAnonymously().catch(e => console.error("Anon Auth Error:", e));
+            }
+        });
+    } catch (e) { console.error("Firebase Init Error:", e); }
+}
+
+window.addEventListener('DOMContentLoaded', () => { 
+    // FAILSAFE: Force remove splash screen after 2.5s no matter what
+    setTimeout(() => {
+        const s = document.getElementById('intro-splash');
+        if(s) {
+            s.classList.add('opacity-0', 'pointer-events-none');
+            setTimeout(() => s.remove(), 700);
+        }
+    }, 2500); 
+
+    initFirebase();
+    renderSidebar();
+    setupAutocomplete();
+    checkPwaStatus(); 
+    if(typeof renderNews === 'function') renderNews();
+    
+    const params = new URLSearchParams(window.location.search);
+    const sharedMode = params.get('mode');
+    if (sharedMode) { checkUrlParams(); } 
+    else { setTimeout(() => { if(typeof switchSystem === 'function') switchSystem('WOOD'); }, 500); }
+});
